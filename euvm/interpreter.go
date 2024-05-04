@@ -1,14 +1,13 @@
-package eul
+package euvm
 
 import (
 	"encoding/binary"
 	"errors"
 	"fmt"
+	"log"
 
 	"github.com/holiman/uint256"
 )
-
-type OpCode byte
 
 type Stack struct {
 	data []uint256.Int
@@ -18,6 +17,18 @@ func NewStack(size int) *Stack {
 	return &Stack{
 		data: make([]uint256.Int, 0, size),
 	}
+}
+
+func (st *Stack) Dump() {
+	fmt.Println("### stack ###")
+	if len(st.data) > 0 {
+		for i, val := range st.data {
+			fmt.Printf("%-3d  %v\n", i, val)
+		}
+	} else {
+		fmt.Println("-- empty --")
+	}
+	fmt.Println("#############")
 }
 
 func (st *Stack) pop() (ret uint256.Int) {
@@ -35,26 +46,9 @@ func (st *Stack) push(d *uint256.Int) {
 	st.data = append(st.data, *d)
 }
 
-// 0x0 arithmetic range
-const (
-	STOP OpCode = iota
-	ADD
-	SUB
-	POP
-	PUSH
-)
-
-// 0x10 range - comparison ops.
-const (
-	LT OpCode = iota + 0x10
-	GT
-	EQ
-)
-
-// 0x20 - debug
-const (
-	PRINT OpCode = iota + 0x20
-)
+func (st *Stack) dup(n int) {
+	st.push(&st.data[len(st.data)-n])
+}
 
 type Interpreter struct {
 }
@@ -70,7 +64,6 @@ func (in *Interpreter) Run(code []byte) {
 		ex := getEx(OpCode(code[pc]))
 		pc++
 		_, err := ex(&pc, scope)
-
 		if err != nil {
 			return
 		}
@@ -80,31 +73,6 @@ func (in *Interpreter) Run(code []byte) {
 type ScopeContext struct {
 	stack *Stack
 	code  []byte
-}
-
-type execution func(pc *uint64, scope *ScopeContext) ([]byte, error)
-
-func getEx(opc OpCode) execution {
-	switch opc {
-	case POP:
-		return opPop
-	case PUSH:
-		return opPush
-	case ADD:
-		return opAdd
-	case SUB:
-		return opSub
-	case GT:
-		return opGt
-	case EQ:
-		return opEq
-	case PRINT:
-		return opPrint
-	case STOP:
-		return opStop
-	}
-
-	panic("unkown opcode")
 }
 
 func opPop(pc *uint64, scope *ScopeContext) ([]byte, error) {
@@ -126,7 +94,7 @@ func opAdd(pc *uint64, scope *ScopeContext) ([]byte, error) {
 }
 
 func opSub(pc *uint64, scope *ScopeContext) ([]byte, error) {
-	fmt.Println("sub")
+	log.Fatal("sub is not implemented")
 	return nil, nil
 }
 
@@ -136,18 +104,38 @@ func opGt(pc *uint64, scope *ScopeContext) ([]byte, error) {
 }
 
 func opEq(pc *uint64, scope *ScopeContext) ([]byte, error) {
-	fmt.Println("eq")
+	x, y := scope.stack.pop(), scope.stack.peek()
+	if x.Eq(y) {
+		y.SetOne()
+	} else {
+		y.Clear()
+	}
+	return nil, nil
+}
+
+func opJumpdest(pc *uint64, scope *ScopeContext) ([]byte, error) {
+	*pc = binary.LittleEndian.Uint64(scope.code[*pc : *pc+8])
 	return nil, nil
 }
 
 var errStopToken = errors.New("reached stop op")
 
 func opStop(pc *uint64, scope *ScopeContext) ([]byte, error) {
+	scope.stack.Dump()
 	fmt.Println("stop")
 	return nil, errStopToken
 }
 
+// experimental for tests only
 func opPrint(pc *uint64, scope *ScopeContext) ([]byte, error) {
 	fmt.Println(scope.stack.peek().Uint64())
+	return nil, nil
+}
+
+func opInput(pc *uint64, scope *ScopeContext) ([]byte, error) {
+	var i int
+	fmt.Scanf("%d", &i)
+	var integer = new(uint256.Int)
+	scope.stack.push(integer.SetUint64(uint64(i)))
 	return nil, nil
 }
