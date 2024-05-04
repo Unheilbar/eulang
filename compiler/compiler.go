@@ -13,6 +13,7 @@ import (
 )
 
 const labelSfx = ":"
+const labelLen = 8
 
 type instruction struct {
 	instruction euvm.OpCode
@@ -48,6 +49,7 @@ func Compile(path string) []byte {
 		if len(spline) > 1 {
 			if strings.Contains(spline[0], "JUMP") {
 				i.label = spline[1]
+				counter += labelLen
 			} else {
 				i.operand = operandToBytes(spline[1])
 			}
@@ -58,10 +60,8 @@ func Compile(path string) []byte {
 	var code []byte
 	for _, ins := range instructions {
 		code = append(code, byte(ins.instruction))
-		if ins.label != "" {
-			operand := operandToBytes(fmt.Sprint(labels[ins.label]))
-			labelLength := len(operand)
-			ins.operand = operandToBytes(fmt.Sprint(labels[ins.label] + labelLength))
+		if ins.label != "" && ins.operand == nil {
+			ins.operand = operandToBytes(fmt.Sprint(labels[ins.label]))
 		}
 
 		code = append(code, ins.operand...)
