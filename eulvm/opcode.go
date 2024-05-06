@@ -1,4 +1,4 @@
-package euvm
+package eulvm
 
 type OpCode byte
 
