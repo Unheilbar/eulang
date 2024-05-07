@@ -125,3 +125,11 @@ func (e *EulVM) Reset() {
 	e.ip = 0
 	e.stackSize = 0
 }
+
+func (e *EulVM) Dump() {
+	fmt.Println("-----stack-----")
+	for i := 0; i < e.stackSize; i++ {
+		fmt.Println(e.stack[i])
+	}
+	fmt.Println("-----dump-----")
+}

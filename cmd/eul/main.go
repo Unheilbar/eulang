@@ -17,4 +17,6 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+
+	elvm.Dump()
 }
