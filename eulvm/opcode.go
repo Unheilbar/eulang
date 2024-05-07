@@ -23,6 +23,7 @@ const (
 const (
 	PRINT OpCode = iota + 0x20
 	INPUT
+	NOP
 )
 
 var OpCodesView = map[string]OpCode{

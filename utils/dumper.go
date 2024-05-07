@@ -1,4 +1,4 @@
-package compiler
+package utils
 
 import (
 	"encoding/binary"
@@ -6,18 +6,12 @@ import (
 	"log"
 	"os"
 
-	"github.com/Unheilbar/eulang/euvm"
+	"github.com/Unheilbar/eulang/eulvm"
 )
 
-const labelSfx = ":"
-const labelLen = 8
+//TODO it's just a prove of conception. euler later come up with a better package name
 
-type instruction struct {
-	Instruction euvm.OpCode
-	Operand     [32]byte
-}
-
-func dumpProgramIntoFile(filename string, program []instruction) (err error) {
+func DumpProgramIntoFile(filename string, program []eulvm.Instruction) (err error) {
 	fi, err := os.Create(filename)
 	if err != nil {
 		return err
@@ -36,7 +30,7 @@ func dumpProgramIntoFile(filename string, program []instruction) (err error) {
 	return err
 }
 
-func loadProgramFromFile(filename string) ([]instruction, error) {
+func LoadProgramFromFile(filename string) ([]eulvm.Instruction, error) {
 	fi, err := os.Open(filename)
 	if err != nil {
 		return nil, err
@@ -47,10 +41,10 @@ func loadProgramFromFile(filename string) ([]instruction, error) {
 		}
 	}()
 
-	var program []instruction
+	var program []eulvm.Instruction
 
 	for {
-		instruction := instruction{}
+		instruction := eulvm.Instruction{}
 		err := binary.Read(fi, binary.LittleEndian, &instruction)
 
 		if err == io.EOF {

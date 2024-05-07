@@ -3,6 +3,8 @@ package eulvm
 import (
 	"errors"
 	"fmt"
+
+	"github.com/holiman/uint256"
 )
 
 const stackCapacity = 1024
@@ -15,7 +17,7 @@ type EulVM struct {
 	stackSize int
 }
 
-const limit = 4096
+const limit = 1024
 
 func New(prog []Instruction) *EulVM {
 	return &EulVM{
@@ -74,13 +76,16 @@ func executeNext(e *EulVM) error {
 		var i int
 		fmt.Scanf("%d", &i)
 		e.stackSize++
-		e.stack[e.stackSize] = inst.Operand
+		e.stack[e.stackSize] = *uint256.NewInt(uint64(i))
 		e.ip++
 		return nil
 	case PRINT:
 		// EULER! for debug only
 		num := e.stack[e.stackSize]
 		fmt.Println(num.Uint64())
+		e.ip++
+		return nil
+	case NOP:
 		e.ip++
 		return nil
 	case STOP:

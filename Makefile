@@ -1,2 +1,14 @@
 run-examples:
-	@go run cmd/eulvm/main.go examples/summator.easm
+	@go run cmd/eul/main.go examples/summator.easm
+
+
+
+
+
+
+
+
+
+
+test-compiler:
+	go test -v compiler/*
