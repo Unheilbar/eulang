@@ -52,10 +52,16 @@ func executeNext(e *EulVM) error {
 	}
 
 	inst := e.program[e.ip]
+	//fmt.Println("call ->", OpCodes[inst.OpCode])
 	switch inst.OpCode {
 	case PUSH:
 		e.stackSize++
 		e.stack[e.stackSize] = inst.Operand
+		e.ip++
+		return nil
+	case DUP:
+		e.stackSize++
+		e.stack[e.stackSize] = e.stack[e.stackSize-1]
 		e.ip++
 		return nil
 	case ADD:
@@ -67,9 +73,28 @@ func executeNext(e *EulVM) error {
 		e.stackSize--
 		e.ip++
 		return nil
+	case EQ:
+		//
+		if e.stack[e.stackSize].Eq(&e.stack[e.stackSize-1]) {
+			e.stack[e.stackSize-1].SetOne()
+		} else {
+			e.stack[e.stackSize-1].Clear()
+		}
+		e.stackSize--
+		e.ip++
+		return nil
 	case JUMPDEST:
-		// TODO validate pointer (or maybe it's already done?)
+		// TODO validate pointer for jump instructions (or maybe it's already done?)
 		e.ip = int(inst.Operand.Uint64())
+		return nil
+	case JUMPI:
+		cond := e.stack[e.stackSize]
+		e.stackSize--
+		if !cond.IsZero() {
+			e.ip = int(inst.Operand.Uint64())
+			return nil
+		}
+		e.ip++
 		return nil
 	case INPUT:
 		//EULER!! for debug only

@@ -9,7 +9,9 @@ const (
 	SUB
 	POP
 	PUSH
+	DUP
 	JUMPDEST
+	JUMPI
 )
 
 // 0x10 range - comparison ops.
@@ -33,6 +35,9 @@ var OpCodesView = map[string]OpCode{
 	"STOP":     STOP,
 	"PUSH":     PUSH,
 	"JUMPDEST": JUMPDEST,
+	"JUMPI":    JUMPI,
+	"EQ":       EQ,
+	"DUP":      DUP,
 }
 
 var OpCodes = map[OpCode]string{
@@ -42,4 +47,7 @@ var OpCodes = map[OpCode]string{
 	STOP:     "STOP",
 	PUSH:     "PUSH",
 	JUMPDEST: "JUMPDEST",
+	JUMPI:    "JUMPI",
+	EQ:       "EQ",
+	DUP:      "DUP",
 }

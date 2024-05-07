@@ -8,7 +8,7 @@ import (
 )
 
 func Test_CompileEasmFromFile(t *testing.T) {
-	program := CompileEasmFromFile("../examples/summator.easm", "")
+	program := CompileEasmFromFile("../examples/loop.easm", "")
 
 	for _, inst := range program {
 		fmt.Println(eulvm.OpCodes[inst.OpCode], inst.Operand.Uint64())

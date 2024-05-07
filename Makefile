@@ -1,5 +1,5 @@
 run-examples:
-	@go run cmd/eul/main.go examples/summator.easm
+	go run cmd/eul/main.go examples/loop.easm
 
 
 

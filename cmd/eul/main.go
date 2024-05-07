@@ -1,6 +1,7 @@
 package main
 
 import (
+	"log"
 	"os"
 
 	"github.com/Unheilbar/eulang/compiler"
@@ -12,5 +13,8 @@ func main() {
 	program := compiler.CompileEasmFromFile(file, "")
 	elvm := eulvm.New(program)
 
-	elvm.Run()
+	err := elvm.Run()
+	if err != nil {
+		log.Fatal(err)
+	}
 }
