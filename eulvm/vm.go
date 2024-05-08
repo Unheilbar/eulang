@@ -52,7 +52,6 @@ func executeNext(e *EulVM) error {
 	}
 
 	inst := e.program[e.ip]
-	//fmt.Println("call ->", OpCodes[inst.OpCode])
 	switch inst.OpCode {
 	case PUSH:
 		e.stackSize++
@@ -128,7 +127,7 @@ func (e *EulVM) Reset() {
 
 func (e *EulVM) Dump() {
 	fmt.Println("-----stack-----")
-	for i := 0; i < e.stackSize; i++ {
+	for i := 0; i <= e.stackSize; i++ {
 		fmt.Println(e.stack[i])
 	}
 	fmt.Println("-----dump-----")
