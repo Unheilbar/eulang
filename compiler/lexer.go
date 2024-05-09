@@ -46,6 +46,35 @@ type token struct {
 	loc eulLoc
 }
 
+type hardcodedToken struct {
+	kind uint8
+	text string
+}
+
+var hardcodedTokens = []hardcodedToken{
+	{eulTokenKindDotDot, ".."},
+	{eulTokenKindName, "func"},
+	{eulTokenKindEqEq, "=="},
+	{eulTokenKindOr, "||"},
+	{eulTokenKindAnd, "&&"},
+	{eulTokenKindNe, "!="},
+	{eulTokenKindGe, ">="},
+	{eulTokenKindOpenParen, "("},
+	{eulTokenKindCloseParen, ")"},
+	{eulTokenKindOpenCurly, "{"},
+	{eulTokenKindCloseCurly, "}"},
+	{eulTokenKindSemicolon, ";"},
+	{eulTokenKindColon, ":"},
+	{eulTokenKindComma, ","},
+	{eulTokenKindEq, "="},
+	{eulTokenKindPlus, "+"},
+	{eulTokenKindMinus, "-"},
+	{eulTokenKindMult, "*"},
+	{eulTokenKindLt, "<"},
+}
+
+// lexer turn native code into the stream of tokens(lexemes).
+// token or lexem is a reprentation of each item in code at simple level
 type lexer struct {
 	content []string
 
@@ -67,7 +96,7 @@ func NewLexer(content []string, filepath string) *lexer {
 func (lex *lexer) next(t *token) bool {
 	lex.current = strings.TrimLeft(lex.current, " ")
 
-	for len(lex.current) == 0 && len(lex.content) != 0 {
+	for len(lex.current) == 0 && len(lex.content) > 1 {
 		lex.nextLine()
 	}
 
@@ -75,15 +104,18 @@ func (lex *lexer) next(t *token) bool {
 		return false
 	}
 
-	//
-	tokenStr := "func"
-	if strings.HasPrefix(lex.current, tokenStr) {
-		*t = lex.chopToken(eulTokenKindName, len(tokenStr))
-		return true
+	// Firstly try parsing hardcoded tokens
+	for _, htok := range hardcodedTokens {
+		if strings.HasPrefix(lex.current, htok.text) {
+			*t = lex.chopToken(htok.kind, len(htok.text))
+			return true
+		}
 	}
-	tokenStr = "("
-	if strings.HasPrefix(lex.current, tokenStr) {
-		*t = lex.chopToken(eulTokenKindName, len(tokenStr))
+
+	// Name token
+	nameToken := chopUntil(lex.current, isName)
+	if strings.HasPrefix(lex.current, nameToken) {
+		*t = lex.chopToken(eulTokenKindName, len(nameToken))
 		return true
 	}
 
@@ -117,4 +149,21 @@ func (lex *lexer) chopToken(kind uint8, size int) token {
 	lex.current = lex.current[size:]
 	lex.lineStart += size
 	return t
+}
+
+func chopUntil(s string, until func(r rune) bool) string {
+	for i, r := range s {
+		if !until(r) {
+			return s[:i]
+		}
+	}
+	return s
+}
+
+func isName(r rune) bool {
+	return ('a' <= r && r <= 'z') ||
+		('A' <= r && r <= 'Z') ||
+		('0' < r && r < '9') ||
+		'_' == r
+
 }

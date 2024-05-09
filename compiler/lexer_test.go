@@ -10,15 +10,19 @@ func Test_LexNext(t *testing.T) {
 	var code = []string{
 		"    ",
 		"  ",
-		"    func () {",
-		"	write(1);",
+		"    func main () {",
+		"       ();",
 		"}",
 	}
 
 	lex := NewLexer(code, "testfile")
 	var tok = &token{}
 	lex.next(tok)
-
+	//lim := 10
+	//for lex.next(tok) && lim > 0 {
+	//	fmt.Println(tok.view)
+	//	lim--
+	//}
 	expTok := &token{
 		kind: eulTokenKindName,
 		view: "func",
@@ -28,6 +32,7 @@ func Test_LexNext(t *testing.T) {
 			filepath: "testfile",
 		},
 	}
+
 	assert.Equal(t, expTok, tok)
 	lex.next(tok)
 }
