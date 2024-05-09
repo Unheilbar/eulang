@@ -73,7 +73,7 @@ var hardcodedTokens = []hardcodedToken{
 	{eulTokenKindLt, "<"},
 }
 
-// lexer turn native code into the stream of tokens(lexemes).
+// lexer turns native code into stream of tokens(lexemes).
 // token or lexem is a reprentation of each item in code at simple level
 type lexer struct {
 	content []string
@@ -105,18 +105,36 @@ func (lex *lexer) next(t *token) bool {
 	}
 
 	// Firstly try parsing hardcoded tokens
-	for _, htok := range hardcodedTokens {
-		if strings.HasPrefix(lex.current, htok.text) {
-			*t = lex.chopToken(htok.kind, len(htok.text))
-			return true
+	{
+		for _, htok := range hardcodedTokens {
+			if strings.HasPrefix(lex.current, htok.text) {
+				*t = lex.chopToken(htok.kind, len(htok.text))
+				return true
+			}
 		}
 	}
 
 	// Name token
-	nameToken := chopUntil(lex.current, isName)
-	if strings.HasPrefix(lex.current, nameToken) {
-		*t = lex.chopToken(eulTokenKindName, len(nameToken))
-		return true
+	{
+		nameToken := chopUntil(lex.current, isName)
+		if len(nameToken) != 0 && strings.HasPrefix(lex.current, nameToken) {
+			*t = lex.chopToken(eulTokenKindName, len(nameToken))
+			return true
+		}
+	}
+
+	// String literal
+	{
+		//NOTE Euler lexer doesn't support new lines
+		if len(lex.current) > 2 && lex.current[0] == '"' {
+			strToken := chopUntil(lex.current[1:], isNotQuoteMark)
+			if len(strToken) >= len(lex.current[1:]) {
+				log.Fatalf("%s:%d:%d unclosed string literal '%s'", lex.filepath, lex.row, lex.lineStart, strToken)
+			}
+			strToken = "\"" + strToken + "\""
+			*t = lex.chopToken(eulTokenKindLitStr, len(strToken))
+			return true
+		}
 	}
 
 	log.Fatalf("%s:%d:%d Unkown token start with '%s'", lex.filepath, lex.row, lex.lineStart, lex.current[:1])
@@ -166,4 +184,8 @@ func isName(r rune) bool {
 		('0' < r && r < '9') ||
 		'_' == r
 
+}
+
+func isNotQuoteMark(r rune) bool {
+	return r != '"'
 }
