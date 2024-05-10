@@ -229,7 +229,7 @@ func (lex *lexer) chopToken(kind uint8, size int) token {
 
 	var t token
 	t.kind = kind
-	t.view = lex.current[:size]
+	t.view = strings.Trim(lex.current[:size], "\"")
 	t.loc = eulLoc{
 		row:      lex.row,
 		col:      lex.lineStart,

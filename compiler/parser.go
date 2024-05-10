@@ -1,9 +1,7 @@
 package compiler
 
 import (
-	"fmt"
 	"log"
-	"strings"
 )
 
 const (
@@ -15,12 +13,12 @@ const (
 
 type eulFuncCallArg struct {
 	value eulExpr
-	next  *eulFuncCallArg
+	//TODO probably makes sense to represent it as linked list so we can iterate through arguments
 }
 
 type eulFuncCall struct {
 	name string
-	args *eulFuncCallArg
+	args []eulFuncCallArg
 }
 
 // NOTE eulang another potential use case for union
@@ -43,53 +41,42 @@ type eulStatement struct {
 }
 
 type eulBlock struct {
-	statement eulStatement
-	next      *eulBlock
+	statements []eulStatement
 }
 
 type eulFuncDef struct {
 	name string
-	body *eulBlock
+	body eulBlock
 }
 
-func parseFuncDef(lex *lexer) {
+func parseFuncDef(lex *lexer) eulFuncDef {
 	//var module can be used in the future
-
+	var f eulFuncDef
 	lex.expectKeyword("func")
-	funcName := lex.expectToken(eulTokenKindName)
+	f.name = lex.expectToken(eulTokenKindName).view
 	lex.expectToken(eulTokenKindOpenParen)
+	//TODO eulang func def do not support args yet
 	lex.expectToken(eulTokenKindCloseParen)
-	fmt.Println("name", funcName)
-	parseCurlyEulBlock(lex)
+	f.body = parseCurlyEulBlock(lex)
+	return f
 }
 
-func parseCurlyEulBlock(lex *lexer) *eulBlock {
+func parseCurlyEulBlock(lex *lexer) eulBlock {
 	lex.expectToken(eulTokenKindOpenCurly)
 	var t = &token{}
-
-	var begin = &eulBlock{}
-	var end = &eulBlock{}
+	var result eulBlock
 
 	for lex.peek(t) && t.kind != eulTokenKindCloseCurly {
-		node := &eulBlock{}
-		node.statement.expr = parseEulExpr(lex)
-		if end != nil {
-			end = node
-			end.next = node
-		} else {
-			if begin != nil {
-				panic("exp not nil begin")
-			}
-			begin = node
-			end = node
-		}
+		result.statements = append(result.statements, eulStatement{
+			expr: parseEulExpr(lex),
+		})
 
 		lex.expectToken(eulTokenKindSemicolon)
 	}
 
 	lex.expectToken(eulTokenKindCloseCurly)
 
-	return begin
+	return result
 }
 
 func parseEulExpr(lex *lexer) eulExpr {
@@ -121,7 +108,7 @@ func parseEulExpr(lex *lexer) eulExpr {
 
 	}
 
-	return eulExpr{}
+	return expr
 }
 
 func parseFuncCall(lex *lexer) eulFuncCall {
@@ -134,18 +121,17 @@ func parseFuncCall(lex *lexer) eulFuncCall {
 	return funcCall
 }
 
-func parseFuncCallArgs(lex *lexer) *eulFuncCallArg {
-	var res = &eulFuncCallArg{}
+func parseFuncCallArgs(lex *lexer) []eulFuncCallArg {
+	var res []eulFuncCallArg
 
 	lex.expectToken(eulTokenKindOpenParen)
-	// TODO parse fun Call currently supports only 1 argument
-	res.value = parseEulExpr(lex)
+	// TODO parse fun Call currently supports only 1 argument fix later
+	arg := parseEulExpr(lex)
+	res = append(res, eulFuncCallArg{arg})
 	lex.expectToken(eulTokenKindCloseParen)
 	return res
 }
 
 func parseStrLit(lex *lexer) string {
-	t := lex.expectToken(eulTokenKindLitStr)
-
-	return strings.Trim(t.view, "\"")
+	return lex.expectToken(eulTokenKindLitStr).view
 }
