@@ -1,6 +1,10 @@
 package compiler
 
-import "fmt"
+import (
+	"fmt"
+	"log"
+	"strings"
+)
 
 const (
 	eulExprKindStrLit uint8 = iota
@@ -9,17 +13,18 @@ const (
 	//... to be continued
 )
 
-type eulFuncArg struct {
+type eulFuncCallArg struct {
 	value eulExpr
-	next  *eulFuncArg
+	next  *eulFuncCallArg
 }
 
 type eulFuncCall struct {
 	name string
-	args *eulFuncArg
+	args *eulFuncCallArg
 }
 
-// TODO eulang another potential use case for union
+// NOTE eulang another potential use case for union
+// NOTE eulang also potentially can be using interface
 type eulExprValue struct {
 	asStrLit   string
 	asFuncCall eulFuncCall
@@ -88,6 +93,59 @@ func parseCurlyEulBlock(lex *lexer) *eulBlock {
 }
 
 func parseEulExpr(lex *lexer) eulExpr {
+	var t token
 
-	panic("not implemented")
+	if !lex.peek(&t) {
+		log.Fatalf("%s:%d:%d expected expression but got EOF", lex.filepath, lex.row, lex.lineStart)
+	}
+
+	var expr eulExpr
+
+	switch t.kind {
+	case eulTokenKindName:
+		funcall := parseFuncCall(lex)
+		expr.kind = eulExprKindFuncCall
+		expr.value = eulExprValue{
+			asFuncCall: funcall,
+		}
+	case eulTokenKindLitStr:
+		strLit := parseStrLit(lex)
+		expr.kind = eulExprKindStrLit
+		expr.value = eulExprValue{
+			asStrLit: strLit,
+		}
+
+	// TODO cases of other token kinds
+	default:
+		log.Fatalf("%s:%d:%d no expression starts with %s", lex.filepath, lex.row, lex.lineStart, t.view)
+
+	}
+
+	return eulExpr{}
+}
+
+func parseFuncCall(lex *lexer) eulFuncCall {
+	var funcCall eulFuncCall
+
+	funcCall.name = lex.expectToken(eulTokenKindName).view
+
+	funcCall.args = parseFuncCallArgs(lex)
+
+	return funcCall
+}
+
+func parseFuncCallArgs(lex *lexer) *eulFuncCallArg {
+	var res = &eulFuncCallArg{}
+
+	lex.expectToken(eulTokenKindOpenParen)
+	// TODO parse fun Call currently supports only 1 argument
+	res.value = parseEulExpr(lex)
+	lex.expectToken(eulTokenKindCloseParen)
+	return res
+}
+
+func parseStrLit(lex *lexer) string {
+	t := lex.expectToken(eulTokenKindLitStr)
+
+	return strings.Trim(t.view, "\"")
 }
