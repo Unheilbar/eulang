@@ -10,7 +10,7 @@ func Test_LexNext(t *testing.T) {
 		"    ",
 		"  ",
 		"    func main () {",
-		`       event("hello")`,
+		`       event("hello");`,
 		"}",
 	}
 
@@ -20,7 +20,7 @@ func Test_LexNext(t *testing.T) {
 	lim := 10
 	for lex.next(tok) && lim > 0 {
 		lim--
-		fmt.Println(tok.view)
+		fmt.Println("view", tok.view, "\tkind", tokenKindNames[tok.kind])
 	}
 	//expTok := &token{
 	//	kind: eulTokenKindName,

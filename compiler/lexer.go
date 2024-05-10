@@ -53,7 +53,7 @@ type hardcodedToken struct {
 
 var hardcodedTokens = []hardcodedToken{
 	{eulTokenKindDotDot, ".."},
-	{eulTokenKindName, "func"},
+	//{eulTokenKindName, "func"}, // all keywords will be handled on a parser level
 	{eulTokenKindEqEq, "=="},
 	{eulTokenKindOr, "||"},
 	{eulTokenKindAnd, "&&"},
@@ -73,6 +73,30 @@ var hardcodedTokens = []hardcodedToken{
 	{eulTokenKindLt, "<"},
 }
 
+var tokenKindNames = map[uint8]string{
+	eulTokenKindName:       "name",
+	eulTokenKindNumber:     "number",
+	eulTokenKindOpenParen:  "(",
+	eulTokenKindCloseParen: ")",
+	eulTokenKindOpenCurly:  "{",
+	eulTokenKindCloseCurly: "}",
+	eulTokenKindSemicolon:  ";",
+	eulTokenKindColon:      ":",
+	eulTokenKindComma:      ",",
+	eulTokenKindEq:         "=",
+	eulTokenKindEqEq:       "==",
+	eulTokenKindPlus:       "+",
+	eulTokenKindMinus:      "-",
+	eulTokenKindMult:       "*",
+	eulTokenKindLt:         "<",
+	eulTokenKindGe:         ">=",
+	eulTokenKindNe:         "!=",
+	eulTokenKindAnd:        "&&",
+	eulTokenKindOr:         "||",
+	eulTokenKindDotDot:     "..",
+	eulTokenKindLitStr:     "string literal",
+}
+
 // lexer turns native code into stream of tokens(lexemes).
 // token or lexem is a reprentation of each item in code at simple level
 type lexer struct {
@@ -84,6 +108,9 @@ type lexer struct {
 	lineStart int //to keep current position on line
 
 	filepath string
+
+	peekBuffer   token
+	isBufferFull bool
 }
 
 func NewLexer(content []string, filepath string) *lexer {
@@ -93,7 +120,48 @@ func NewLexer(content []string, filepath string) *lexer {
 	}
 }
 
+func (lex *lexer) expectToken(expKind uint8) token {
+	var t token
+
+	if !lex.next(&t) {
+		log.Fatalf("%s expected token %s but reached EOF", lex.filepath, tokenKindNames[expKind])
+	}
+
+	if t.kind != expKind {
+		log.Fatalf("%s:%d:%d expected token kind %s but got %s", lex.filepath, t.loc.row, t.loc.col, tokenKindNames[expKind], tokenKindNames[t.kind])
+	}
+
+	return t
+}
+
+func (lex *lexer) expectKeyword(keyword string) token {
+	token := lex.expectToken(eulTokenKindName)
+	if token.view != keyword {
+		log.Fatalf("%s:%d:%d expected keyword %s but got %s", lex.filepath, token.loc.row, token.loc.col, keyword, token.view)
+	}
+
+	return token
+}
+
+// peek gets next token in tokenizer content without changing current state of the lexer
 func (lex *lexer) next(t *token) bool {
+	if !lex.peek(t) {
+		return false
+	}
+
+	lex.isBufferFull = false
+	return true
+}
+
+// next iterates through tokens in lexer content
+func (lex *lexer) peek(t *token) bool {
+	// Check peek buffer
+	if lex.isBufferFull {
+		*t = lex.peekBuffer
+		return true
+	}
+
+	// Extract next token
 	lex.current = strings.TrimLeft(lex.current, " ")
 
 	for len(lex.current) == 0 && len(lex.content) > 1 {
@@ -125,7 +193,7 @@ func (lex *lexer) next(t *token) bool {
 
 	// String literal
 	{
-		//NOTE Euler lexer doesn't support new lines
+		//NOTE Euler lexer doesn't support new lines for string literals
 		if len(lex.current) > 2 && lex.current[0] == '"' {
 			strToken := chopUntil(lex.current[1:], isNotQuoteMark)
 			if len(strToken) >= len(lex.current[1:]) {
@@ -153,8 +221,12 @@ func (lex *lexer) nextLine() {
 
 func (lex *lexer) chopToken(kind uint8, size int) token {
 	if size > len(lex.current) {
-		panic("invalid chop token call")
+		panic("invalid chop token call, token size bigger than current line")
 	}
+	if lex.isBufferFull {
+		panic("invalid chop token call, peek buffer is full")
+	}
+
 	var t token
 	t.kind = kind
 	t.view = lex.current[:size]
@@ -166,6 +238,9 @@ func (lex *lexer) chopToken(kind uint8, size int) token {
 
 	lex.current = lex.current[size:]
 	lex.lineStart += size
+
+	lex.peekBuffer = t
+	lex.isBufferFull = true
 	return t
 }
 
