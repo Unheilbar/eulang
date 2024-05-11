@@ -42,9 +42,6 @@ func (e *eulang) compileStatementIntoEasm(easm *easm, stmt eulStatement) {
 }
 
 func (e *eulang) compileIfIntoEasm(easm *easm, eif eulIf) {
-	if eif.elze != nil {
-		panic("else for expressions is not supported by the compiler")
-	}
 
 	e.compileExprIntoEasm(easm, eif.condition)
 
@@ -52,16 +49,27 @@ func (e *eulang) compileIfIntoEasm(easm *easm, eif eulIf) {
 		OpCode: eulvm.NOT,
 	})
 
-	jumpIfaddr := easm.pushInstruction(eulvm.Instruction{
+	jmpThenAddr := easm.pushInstruction(eulvm.Instruction{
 		OpCode: eulvm.JUMPI,
 	})
 	e.compileBlockIntoEasm(easm, eif.ethen)
-	bodyEndAddr := easm.program.Size()
 
-	easm.program.Instrutions[jumpIfaddr].Operand = *uint256.NewInt(uint64(bodyEndAddr))
+	jmpElseAddr := easm.pushInstruction(eulvm.Instruction{
+		OpCode: eulvm.JUMPDEST,
+	})
+	elseAddr := easm.program.Size()
+	e.compileBlockIntoEasm(easm, eif.elze)
+
+	endAddr := easm.program.Size()
+
+	easm.program.Instrutions[jmpThenAddr].Operand = *uint256.NewInt(uint64(elseAddr))
+	easm.program.Instrutions[jmpElseAddr].Operand = *uint256.NewInt(uint64(endAddr))
 }
 
 func (e *eulang) compileBlockIntoEasm(easm *easm, block *eulBlock) {
+	if block == nil {
+		return
+	}
 	for _, stmt := range block.statements {
 		e.compileStatementIntoEasm(easm, stmt)
 	}

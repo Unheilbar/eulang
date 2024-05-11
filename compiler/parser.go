@@ -87,15 +87,25 @@ func ParseFuncDef(lex *lexer) eulFuncDef {
 
 func parseEulIf(lex *lexer) eulIf {
 	var eif eulIf
-	t := lex.expectKeyword("if")
-	eif.loc = t.loc
+	// Parse then
+	{
+		t := lex.expectKeyword("if")
+		eif.loc = t.loc
 
-	lex.expectToken(eulTokenKindOpenParen)
-	eif.condition = parseEulExpr(lex)
-	lex.expectToken(eulTokenKindCloseParen)
-	eif.ethen = parseCurlyEulBlock(lex)
+		lex.expectToken(eulTokenKindOpenParen)
+		eif.condition = parseEulExpr(lex)
+		lex.expectToken(eulTokenKindCloseParen)
+		eif.ethen = parseCurlyEulBlock(lex)
+	}
 
-	//TODO eulang if doesnt support else
+	// Parse else if exists
+	{
+		var t token
+		if lex.peek(&t) && t.kind == eulTokenKindName && t.view == "else" {
+			lex.next(&t)
+			eif.elze = parseCurlyEulBlock(lex)
+		}
+	}
 
 	return eif
 }

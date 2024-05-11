@@ -1,9 +1,8 @@
-
 func main(){
   if (true) {
     write("eulang rules");  
-  } 
-  if (false){
+  } else {
     write("eulang sucks");
   }
+  write("i've passed else");
 } 

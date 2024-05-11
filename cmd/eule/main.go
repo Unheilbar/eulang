@@ -10,12 +10,10 @@ import (
 
 func main() {
 	file := os.Args[1]
-
 	lex := compiler.NewLexerFromFile(file)
 	funcDef := compiler.ParseFuncDef(lex)
 	eulang := compiler.NewEulang()
 	easm := compiler.NewEasm()
-
 	//TODO later elang will export method to compile from file
 	eulang.CompileFuncCallIntoEasm(easm, funcDef)
 
