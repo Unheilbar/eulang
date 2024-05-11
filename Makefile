@@ -1,5 +1,5 @@
 run-examples:
-	go run cmd/eul/main.go examples/hello.easm
+	go run cmd/eule/main.go examples/hello.eul
 
 
 

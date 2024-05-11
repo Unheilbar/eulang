@@ -21,10 +21,16 @@ type EulVM struct {
 
 const ProgramLimit = 1024
 
-func New(prog []Instruction) *EulVM {
+func New(prog Program) *EulVM {
+	var m *Memory
+	if len(prog.PreallocMemory) != 0 {
+		m = NewMemoryWithPrealloc(prog.PreallocMemory)
+	} else {
+		m = NewMemory()
+	}
 	return &EulVM{
-		program: prog,
-		memory:  NewMemory(),
+		program: prog.Instrutions,
+		memory:  m,
 	}
 }
 
@@ -57,6 +63,7 @@ func executeNext(e *EulVM) error {
 	}
 
 	inst := e.program[e.ip]
+
 	switch inst.OpCode {
 	case PUSH:
 		e.stackSize++
@@ -124,10 +131,8 @@ func executeNext(e *EulVM) error {
 		return nil
 	// TODO in a future case MSTORE8:
 	case NATIVE:
-		id := e.stack[e.stackSize].Uint64()
-		e.stackSize--
 		e.ip++
-		return e.execNative(id)
+		return e.execNative(inst.Operand.Uint64())
 	case MSTORE256:
 		offset := e.stack[e.stackSize].Uint64()
 		val := e.stack[e.stackSize-1]
@@ -179,8 +184,8 @@ func (e *EulVM) execNative(id uint64) error {
 		size := e.stack[e.stackSize]
 		addr := e.stack[e.stackSize-1]
 		e.stackSize -= 2
-
-		fmt.Println(string(e.memory.store[addr.Uint64():size.Uint64()]))
+		fmt.Println(string(e.memory.store[addr.Uint64() : addr.Uint64()+size.Uint64()]))
+		return nil
 	}
 
 	return errUnknownNative

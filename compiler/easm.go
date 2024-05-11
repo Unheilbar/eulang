@@ -8,6 +8,7 @@ import (
 	"strings"
 
 	"github.com/Unheilbar/eulang/eulvm"
+	"github.com/Unheilbar/eulang/utils"
 	"github.com/holiman/uint256"
 )
 
@@ -17,7 +18,7 @@ type easm struct {
 	memory  *eulvm.Memory
 }
 
-func newEasm() *easm {
+func NewEasm() *easm {
 	return &easm{
 		memory: eulvm.NewMemory(),
 	}
@@ -53,6 +54,12 @@ func (e *easm) pushInstruction(i eulvm.Instruction) int {
 	return e.program.PushInstruction(i)
 }
 
+// TODO later shouldn't be public
+func (e *easm) PushInstruction(i eulvm.Instruction) int {
+	//TODO euler do we need program capacity?
+	return e.program.PushInstruction(i)
+}
+
 func strToWords(str string) []eulvm.Word {
 	words := make([]eulvm.Word, 0)
 	offset := 0
@@ -65,7 +72,9 @@ func strToWords(str string) []eulvm.Word {
 	}
 	if offset < len(str) {
 		var word eulvm.Word
-		word.SetBytes([]byte(str[offset:]))
+		var b [32]byte
+		copy(b[:], []byte(str))
+		word.SetBytes32(b[:])
 		words = append(words, word)
 	}
 
@@ -73,7 +82,13 @@ func strToWords(str string) []eulvm.Word {
 }
 
 func (e *easm) dumpProgramToFile(filepath string) {
+	e.program.PreallocMemory = e.memory.Store()
+	utils.DumpProgramIntoFile(filepath, e.program)
+}
 
+func (e *easm) GetProgram() eulvm.Program {
+	e.program.PreallocMemory = e.memory.Store()
+	return e.program
 }
 
 // [DEPRECATED]

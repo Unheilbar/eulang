@@ -17,6 +17,13 @@ func NewMemory() *Memory {
 	return &Memory{}
 }
 
+func NewMemoryWithPrealloc(prealloc []byte) *Memory {
+	m := &Memory{}
+	copy(m.store[:], prealloc)
+	m.size = uint64(len(prealloc))
+	return m
+}
+
 func (m *Memory) Set32(offset uint64, val uint256.Int) {
 	// length of store may never be less than offset + size.
 	// The store should be resized PRIOR to setting the memory
@@ -32,6 +39,12 @@ func (m *Memory) Set32(offset uint64, val uint256.Int) {
 
 func (m *Memory) Size() uint64 {
 	return m.size
+}
+
+func (m *Memory) Store() []byte {
+	res := make([]byte, m.size)
+	copy(res[:], m.store[:m.size])
+	return res
 }
 
 func (m *Memory) Dump() {

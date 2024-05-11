@@ -13,11 +13,18 @@ type eulang struct {
 	funcs []compiledFuncs
 }
 
-func newEulang() *eulang {
+func NewEulang() *eulang {
 	return &eulang{}
 }
 
 func (e *eulang) compileFuncCallIntoEasm(easm *easm, fd eulFuncDef) {
+	for _, statement := range fd.body.statements {
+		e.compileStatementIntoEasm(easm, statement)
+	}
+}
+
+// TODO temp later should be public
+func (e *eulang) CompileFuncCallIntoEasm(easm *easm, fd eulFuncDef) {
 	for _, statement := range fd.body.statements {
 		e.compileStatementIntoEasm(easm, statement)
 	}

@@ -16,8 +16,10 @@ func Test_parseFuncDef(t *testing.T) {
 	}
 
 	lex := NewLexer(code, "testfile")
-	funcDef := parseFuncDef(lex)
+	funcDef := ParseFuncDef(lex)
+
 	fmt.Println("funcName", funcDef.name)
+
 	for i, stmt := range funcDef.body.statements {
 		fmt.Println(i, "statement: ", stmt)
 	}

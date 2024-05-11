@@ -1,5 +1,5 @@
+
 func hello(){
-	a = input()
-	b = input()
-	write(a+b)
+      write("hello from eulang!");
+      write("hello again!");
 }

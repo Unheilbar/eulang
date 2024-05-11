@@ -1,7 +1,9 @@
 package compiler
 
 import (
+	"bufio"
 	"log"
+	"os"
 	"strings"
 )
 
@@ -118,6 +120,23 @@ func NewLexer(content []string, filepath string) *lexer {
 		content:  content,
 		filepath: filepath,
 	}
+}
+
+func NewLexerFromFile(filename string) *lexer {
+	fi, err := os.Open(filename)
+	if err != nil {
+		log.Fatalf("err create lexer open file %s err %s", filename, err)
+	}
+
+	defer fi.Close()
+
+	scanner := bufio.NewScanner(fi)
+	var content []string
+	for scanner.Scan() {
+		content = append(content, scanner.Text())
+	}
+
+	return NewLexer(content, filename)
 }
 
 func (lex *lexer) expectToken(expKind uint8) token {

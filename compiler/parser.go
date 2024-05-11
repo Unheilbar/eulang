@@ -51,7 +51,7 @@ type eulFuncDef struct {
 	body eulBlock
 }
 
-func parseFuncDef(lex *lexer) eulFuncDef {
+func ParseFuncDef(lex *lexer) eulFuncDef {
 	//var module can be used in the future
 	var f eulFuncDef
 	lex.expectKeyword("func")
