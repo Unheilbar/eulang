@@ -15,18 +15,21 @@ type EulVM struct {
 
 	stack     [stackCapacity]Word
 	stackSize int
+
+	memory *Memory
 }
 
-const limit = 1024
+const ProgramLimit = 1024
 
 func New(prog []Instruction) *EulVM {
 	return &EulVM{
 		program: prog,
+		memory:  NewMemory(),
 	}
 }
 
 func (e *EulVM) Run() error {
-	for i := 0; i < limit; i++ {
+	for i := 0; i < ProgramLimit; i++ {
 		err := executeNext(e)
 		if err != nil {
 			if err == stopToken {
@@ -42,6 +45,8 @@ var (
 	errIllegalCall          = errors.New("illegal program call")
 	errProgramLimitExceeded = errors.New("program limit cycle exceeded")
 	errInvalidOpCodeCalled  = errors.New("opcode doesn't exist")
+	errInvalidMemoryAccess  = errors.New("program accessed memory beyond memory capacity")
+	errUnknownNative        = errors.New("native function doesn't exists")
 )
 
 var stopToken = errors.New("program stopped")
@@ -104,9 +109,39 @@ func executeNext(e *EulVM) error {
 		e.ip++
 		return nil
 	case PRINT:
-		// EULER! for debug only
+		// EULER! for debug only [deprecated use native]
 		num := e.stack[e.stackSize]
 		fmt.Println(num.Uint64())
+		e.ip++
+		return nil
+	case WRITESTR:
+		// EULER! for debug only [deprecated use native]
+		size := e.stack[e.stackSize].Uint64()
+		offset := e.stack[e.stackSize-1].Uint64()
+		fmt.Println(string(e.memory.store[offset:size]))
+		e.ip++
+		e.stackSize -= 2
+		return nil
+	// TODO in a future case MSTORE8:
+	case NATIVE:
+		id := e.stack[e.stackSize].Uint64()
+		e.stackSize--
+		e.ip++
+		return e.execNative(id)
+	case MSTORE256:
+		offset := e.stack[e.stackSize].Uint64()
+		val := e.stack[e.stackSize-1]
+		e.memory.Set32(offset, val)
+		e.stackSize -= 2
+		e.ip++
+		return nil
+	case MLOAD:
+		addr := e.stack[e.stackSize].Uint64()
+		if addr > MemoryCapacity {
+			return errInvalidMemoryAccess
+		}
+
+		e.stack[e.stackSize].SetBytes(e.memory.store[addr:32])
 		e.ip++
 		return nil
 	case NOP:
@@ -131,4 +166,22 @@ func (e *EulVM) Dump() {
 		fmt.Println(e.stack[i])
 	}
 	fmt.Println("-----dump-----")
+}
+
+// euler native functions
+const (
+	NativeWrite uint64 = iota + 1
+)
+
+func (e *EulVM) execNative(id uint64) error {
+	switch id {
+	case NativeWrite:
+		size := e.stack[e.stackSize]
+		addr := e.stack[e.stackSize-1]
+		e.stackSize -= 2
+
+		fmt.Println(string(e.memory.store[addr.Uint64():size.Uint64()]))
+	}
+
+	return errUnknownNative
 }

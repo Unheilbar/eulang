@@ -1,0 +1,41 @@
+package eulvm
+
+import (
+	"fmt"
+
+	"github.com/holiman/uint256"
+)
+
+const MemoryCapacity = 4 * 1024 // memory limit to avoid extra allocations during execution
+
+type Memory struct {
+	store [MemoryCapacity]byte //
+	size  uint64
+}
+
+func NewMemory() *Memory {
+	return &Memory{}
+}
+
+func (m *Memory) Set32(offset uint64, val uint256.Int) {
+	// length of store may never be less than offset + size.
+	// The store should be resized PRIOR to setting the memory
+	if offset+32 > uint64(MemoryCapacity) {
+		panic("invalid memory: store empty")
+	}
+	// Zero the memory area
+	copy(m.store[offset:offset+32], []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0})
+	// Fill in relevant bits
+	val.WriteToSlice(m.store[offset:])
+	m.size += 32
+}
+
+func (m *Memory) Size() uint64 {
+	return m.size
+}
+
+func (m *Memory) Dump() {
+	fmt.Println("===memory dump===")
+	fmt.Println(m.store[:m.size])
+	fmt.Println("=end memory dump=")
+}

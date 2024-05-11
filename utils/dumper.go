@@ -1,39 +1,39 @@
 package utils
 
 import (
-	"encoding/binary"
-	"io"
+	"encoding/gob"
 	"log"
 	"os"
 
 	"github.com/Unheilbar/eulang/eulvm"
 )
 
-//TODO it's just a prove of conception. euler later come up with a better package name
+//TODO it's just a prove of conception. eulang later come up with a better package name
 
-func DumpProgramIntoFile(filename string, program []eulvm.Instruction) (err error) {
+func DumpProgramIntoFile(filename string, program eulvm.Program) (err error) {
 	fi, err := os.Create(filename)
 	if err != nil {
 		return err
 	}
+	gob.Register(program)
 	defer func() {
 		if err := fi.Close(); err != nil {
 			log.Fatal("can't close file", err)
 		}
 	}()
 
-	err = binary.Write(fi, binary.LittleEndian, program)
+	err = gob.NewEncoder(fi).Encode(program)
 	if err != nil {
-		log.Fatal("cant write to file", err)
+		log.Fatalf("can't encode program into file %s err %s", filename, err)
 	}
 
-	return err
+	return nil
 }
 
-func LoadProgramFromFile(filename string) ([]eulvm.Instruction, error) {
+func LoadProgramFromFile(filename string) (eulvm.Program, error) {
 	fi, err := os.Open(filename)
 	if err != nil {
-		return nil, err
+		return eulvm.Program{}, err
 	}
 	defer func() {
 		if err := fi.Close(); err != nil {
@@ -41,17 +41,13 @@ func LoadProgramFromFile(filename string) ([]eulvm.Instruction, error) {
 		}
 	}()
 
-	var program []eulvm.Instruction
+	var program eulvm.Program
 
-	for {
-		instruction := eulvm.Instruction{}
-		err := binary.Read(fi, binary.LittleEndian, &instruction)
+	err = gob.NewDecoder(fi).Decode(&program)
 
-		if err == io.EOF {
-			break
-		}
-
-		program = append(program, instruction)
+	if err != nil {
+		log.Fatalf("can't decode file %s err %s", filename, err)
 	}
-	return program, err
+
+	return program, nil
 }

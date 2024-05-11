@@ -12,10 +12,12 @@ import (
 func Test_DumpLoad(t *testing.T) {
 	var filename = "test.o"
 
-	program := []eulvm.Instruction{
+	instructions := []eulvm.Instruction{
 		{OpCode: eulvm.ADD, Operand: *uint256.NewInt(10)},
 		{OpCode: eulvm.SUB, Operand: *uint256.NewInt(10)},
 	}
+
+	program := eulvm.NewProgram(instructions, []byte{1, 2, 3})
 
 	err := DumpProgramIntoFile(filename, program)
 

@@ -19,6 +19,8 @@ type eulFuncCallArg struct {
 type eulFuncCall struct {
 	name string
 	args []eulFuncCallArg
+
+	loc eulLoc
 }
 
 // NOTE eulang another potential use case for union
@@ -114,8 +116,9 @@ func parseEulExpr(lex *lexer) eulExpr {
 func parseFuncCall(lex *lexer) eulFuncCall {
 	var funcCall eulFuncCall
 
-	funcCall.name = lex.expectToken(eulTokenKindName).view
-
+	t := lex.expectToken(eulTokenKindName)
+	funcCall.name = t.view
+	funcCall.loc = t.loc
 	funcCall.args = parseFuncCallArgs(lex)
 
 	return funcCall
