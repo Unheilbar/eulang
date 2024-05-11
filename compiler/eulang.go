@@ -9,6 +9,7 @@ import (
 
 type compiledFuncs struct{}
 
+// eulang stores all the context of euler compiler (compiled functions, scopes, etc.)
 type eulang struct {
 	funcs []compiledFuncs
 }

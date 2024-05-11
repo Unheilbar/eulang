@@ -136,7 +136,7 @@ func NewLexerFromFile(filename string) *lexer {
 	// FIXME doesn't work without it
 	content = append(content, " ")
 	for scanner.Scan() {
-		content = append(content, scanner.Text())
+		content = append(content, strings.ReplaceAll(scanner.Text(), "	", " "))
 	}
 
 	return NewLexer(content, filename)

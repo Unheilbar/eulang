@@ -12,7 +12,7 @@ import (
 	"github.com/holiman/uint256"
 )
 
-// easm represents a translation context of the compiler
+// easm traverses ast and translates expressions from ast to assembly instructions
 type easm struct {
 	program eulvm.Program
 	memory  *eulvm.Memory
