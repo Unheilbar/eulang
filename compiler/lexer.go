@@ -132,6 +132,9 @@ func NewLexerFromFile(filename string) *lexer {
 
 	scanner := bufio.NewScanner(fi)
 	var content []string
+
+	// FIXME doesn't work without it
+	content = append(content, " ")
 	for scanner.Scan() {
 		content = append(content, scanner.Text())
 	}
@@ -181,9 +184,10 @@ func (lex *lexer) peek(t *token) bool {
 	}
 
 	// Extract next token
+	// TODO doesn't trim tabs
 	lex.current = strings.TrimLeft(lex.current, " ")
 
-	for len(lex.current) == 0 && len(lex.content) > 1 {
+	for len(lex.current) == 0 && len(lex.content) > 0 {
 		lex.nextLine()
 	}
 

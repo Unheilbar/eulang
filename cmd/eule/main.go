@@ -15,6 +15,8 @@ func main() {
 	funcDef := compiler.ParseFuncDef(lex)
 	eulang := compiler.NewEulang()
 	easm := compiler.NewEasm()
+
+	//TODO later elang will export method to compile from file
 	eulang.CompileFuncCallIntoEasm(easm, funcDef)
 
 	// TODO later eulang will push stop instruction
@@ -23,7 +25,10 @@ func main() {
 	})
 
 	prog := easm.GetProgram()
+	//for idx, inst := range prog.Instrutions {
+	//	fmt.Println(idx, eulvm.OpCodes[inst.OpCode], inst.Operand.Uint64())
 
+	//}
 	e := eulvm.New(prog)
 	err := e.Run()
 	if err != nil {

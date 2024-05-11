@@ -4,8 +4,10 @@ import (
 	"log"
 )
 
+type eulExprKind uint8
+
 const (
-	eulExprKindStrLit uint8 = iota
+	eulExprKindStrLit eulExprKind = iota
 	eulExprKindFuncCall
 
 	//... to be continued
@@ -32,14 +34,33 @@ type eulExprValue struct {
 	//... to be continued
 }
 
+type eulIf struct {
+	loc       eulLoc
+	condition eulExpr
+	ethen     *eulBlock
+	elze      *eulBlock //because else is busy by golang
+}
+
 type eulExpr struct {
-	kind  uint8
+	kind  eulExprKind
 	value eulExprValue
 }
 
-type eulStatement struct {
+type eulStmtKind uint8
+
+const (
+	eulStmtKindExpr eulStmtKind = iota
+	eulStmtKindIf               = iota
+)
+
+type eulStatementAs struct {
 	expr eulExpr
-	kind uint8
+	eif  eulIf
+}
+
+type eulStatement struct {
+	as   eulStatementAs
+	kind eulStmtKind
 }
 
 type eulBlock struct {
@@ -59,26 +80,60 @@ func ParseFuncDef(lex *lexer) eulFuncDef {
 	lex.expectToken(eulTokenKindOpenParen)
 	//TODO eulang func def do not support args yet
 	lex.expectToken(eulTokenKindCloseParen)
-	f.body = parseCurlyEulBlock(lex)
+	f.body = *parseCurlyEulBlock(lex)
 	return f
 }
 
-func parseCurlyEulBlock(lex *lexer) eulBlock {
+func parseEulIf(lex *lexer) eulIf {
+	var eif eulIf
+	t := lex.expectKeyword("if")
+	eif.loc = t.loc
+
+	lex.expectToken(eulTokenKindOpenParen)
+	eif.condition = parseEulExpr(lex)
+	lex.expectToken(eulTokenKindCloseParen)
+	eif.ethen = parseCurlyEulBlock(lex)
+
+	//TODO eulang if doesnt support else
+
+	return eif
+}
+
+func parseEulStmt(lex *lexer) eulStatement {
+
+	var t token
+	if !lex.peek(&t) {
+		log.Fatalf("%s:%d:%d expected statement but got EOF", lex.filepath, lex.row, lex.lineStart)
+	}
+
+	if t.kind == eulTokenKindName && t.view == "if" {
+		var stmt eulStatement
+		stmt.kind = eulStmtKindIf
+		stmt.as.eif = parseEulIf(lex)
+		return stmt
+	}
+
+	var stmt eulStatement
+	stmt.kind = eulStmtKindExpr
+	stmt.as.expr = parseEulExpr(lex)
+	lex.expectToken(eulTokenKindSemicolon)
+
+	return stmt
+}
+
+func parseCurlyEulBlock(lex *lexer) *eulBlock {
 	lex.expectToken(eulTokenKindOpenCurly)
 	var t = &token{}
 	var result eulBlock
 
 	for lex.peek(t) && t.kind != eulTokenKindCloseCurly {
-		result.statements = append(result.statements, eulStatement{
-			expr: parseEulExpr(lex),
-		})
+		result.statements = append(result.statements, parseEulStmt(lex))
 
-		lex.expectToken(eulTokenKindSemicolon)
 	}
 
 	lex.expectToken(eulTokenKindCloseCurly)
 
-	return result
+	return &result
 }
 
 func parseEulExpr(lex *lexer) eulExpr {

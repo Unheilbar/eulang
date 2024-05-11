@@ -1,5 +1,3 @@
-
 func hello(){
-      write("hello from eulang!");
-      write("hello again!");
+   write("hello from eulang!");
 }

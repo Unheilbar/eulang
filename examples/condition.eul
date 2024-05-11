@@ -1,0 +1,9 @@
+
+func main(){
+  if (true("")) {
+    write("eulang rules");  
+  } 
+  if (false("")){
+    write("eulang sucks");
+  }
+} 

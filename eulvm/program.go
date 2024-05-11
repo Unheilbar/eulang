@@ -19,6 +19,10 @@ func NewProgram(instrs []Instruction, preallocMemory []byte) Program {
 func (p *Program) PushInstruction(i Instruction) int {
 	//TODO do we need program capacity here?
 	p.Instrutions = append(p.Instrutions, i)
+	return len(p.Instrutions) - 1
+}
+
+func (p *Program) Size() int {
 	return len(p.Instrutions)
 }
 

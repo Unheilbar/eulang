@@ -64,6 +64,7 @@ func executeNext(e *EulVM) error {
 
 	inst := e.program[e.ip]
 
+	//fmt.Println("-->call", OpCodes[inst.OpCode], "operand", inst.Operand.Uint64())
 	switch inst.OpCode {
 	case PUSH:
 		e.stackSize++
@@ -150,6 +151,14 @@ func executeNext(e *EulVM) error {
 		e.ip++
 		return nil
 	case NOP:
+		e.ip++
+		return nil
+	case NOT:
+		if e.stack[e.stackSize].IsZero() {
+			e.stack[e.stackSize][0] = 1
+		} else {
+			e.stack[e.stackSize].Clear()
+		}
 		e.ip++
 		return nil
 	case STOP:

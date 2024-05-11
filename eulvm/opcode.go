@@ -23,6 +23,7 @@ const (
 	LT OpCode = iota + 0x10
 	GT
 	EQ
+	NOT
 )
 
 // 0x20 - debug
@@ -50,6 +51,7 @@ var OpCodesView = map[string]OpCode{
 	"MLOAD":     MLOAD,
 	"MLOAD256":  MLOAD256,
 	"NATIVE":    NATIVE,
+	"NOT":       NOT,
 }
 
 var OpCodes = map[OpCode]string{
@@ -68,4 +70,5 @@ var OpCodes = map[OpCode]string{
 	MLOAD:     "MLOAD",
 	MLOAD256:  "MLOAD256",
 	NATIVE:    "NATIVE",
+	NOT:       "NOT",
 }
