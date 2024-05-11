@@ -4,15 +4,6 @@ import (
 	"log"
 )
 
-type eulExprKind uint8
-
-const (
-	eulExprKindStrLit eulExprKind = iota
-	eulExprKindFuncCall
-
-	//... to be continued
-)
-
 type eulFuncCallArg struct {
 	value eulExpr
 	//TODO probably makes sense to represent it as linked list so we can iterate through arguments
@@ -27,10 +18,10 @@ type eulFuncCall struct {
 
 // NOTE eulang another potential use case for union
 // NOTE eulang also potentially can be using interface
-type eulExprValue struct {
-	asStrLit   string
-	asFuncCall eulFuncCall
-	asU64      uint64
+type eulExprAs struct {
+	strLit   string
+	funcCall eulFuncCall
+	boolean  bool
 	//... to be continued
 }
 
@@ -41,9 +32,19 @@ type eulIf struct {
 	elze      *eulBlock //because else is busy by golang
 }
 
+type eulExprKind uint8
+
+const (
+	eulExprKindStrLit eulExprKind = iota
+	eulExprKindBoolLit
+	eulExprKindFuncCall
+
+	//... to be continued
+)
+
 type eulExpr struct {
-	kind  eulExprKind
-	value eulExprValue
+	kind eulExprKind
+	as   eulExprAs
 }
 
 type eulStmtKind uint8
@@ -147,16 +148,27 @@ func parseEulExpr(lex *lexer) eulExpr {
 
 	switch t.kind {
 	case eulTokenKindName:
-		funcall := parseFuncCall(lex)
-		expr.kind = eulExprKindFuncCall
-		expr.value = eulExprValue{
-			asFuncCall: funcall,
+		if t.view == "true" {
+			lex.next(&t)
+			expr.as.boolean = true
+			expr.kind = eulExprKindBoolLit
+		} else if t.view == "false" {
+			lex.next(&t)
+			expr.as.boolean = false
+			expr.kind = eulExprKindBoolLit
+		} else if t.view == "false" {
+		} else {
+			funcall := parseFuncCall(lex)
+			expr.kind = eulExprKindFuncCall
+			expr.as = eulExprAs{
+				funcCall: funcall,
+			}
 		}
 	case eulTokenKindLitStr:
 		strLit := parseStrLit(lex)
 		expr.kind = eulExprKindStrLit
-		expr.value = eulExprValue{
-			asStrLit: strLit,
+		expr.as = eulExprAs{
+			strLit: strLit,
 		}
 
 	// TODO cases of other token kinds

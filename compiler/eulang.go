@@ -71,18 +71,18 @@ func (e *eulang) compileExprIntoEasm(easm *easm, expr eulExpr) {
 	switch expr.kind {
 	case eulExprKindFuncCall:
 		// TODO temporary solution hard code just one function
-		if expr.value.asFuncCall.name == "write" {
-			e.compileExprIntoEasm(easm, expr.value.asFuncCall.args[0].value)
+		if expr.as.funcCall.name == "write" {
+			e.compileExprIntoEasm(easm, expr.as.funcCall.args[0].value)
 			easm.pushInstruction(eulvm.Instruction{
 				OpCode:  eulvm.OpCode(eulvm.NATIVE),
 				Operand: *uint256.NewInt(eulvm.NativeWrite),
 			})
-		} else if expr.value.asFuncCall.name == "true" {
+		} else if expr.as.funcCall.name == "true" {
 			easm.pushInstruction(eulvm.Instruction{
 				OpCode:  eulvm.PUSH,
 				Operand: *uint256.NewInt(1),
 			})
-		} else if expr.value.asFuncCall.name == "false" {
+		} else if expr.as.funcCall.name == "false" {
 			easm.pushInstruction(eulvm.Instruction{
 				OpCode: eulvm.PUSH,
 			})
@@ -90,7 +90,7 @@ func (e *eulang) compileExprIntoEasm(easm *easm, expr eulExpr) {
 			panic("unexpected name")
 		}
 	case eulExprKindStrLit:
-		var addr eulvm.Word = easm.pushStringToMemory(expr.value.asStrLit)
+		var addr eulvm.Word = easm.pushStringToMemory(expr.as.strLit)
 
 		pushStrAddrInst := eulvm.Instruction{
 			OpCode:  eulvm.PUSH,
@@ -101,10 +101,21 @@ func (e *eulang) compileExprIntoEasm(easm *easm, expr eulExpr) {
 
 		pushStrSizeInst := eulvm.Instruction{
 			OpCode:  eulvm.PUSH,
-			Operand: *uint256.NewInt(uint64(len(expr.value.asStrLit))),
+			Operand: *uint256.NewInt(uint64(len(expr.as.strLit))),
 		}
 
 		easm.pushInstruction(pushStrSizeInst)
+	case eulExprKindBoolLit:
+		if expr.as.boolean {
+			easm.pushInstruction(eulvm.Instruction{
+				OpCode:  eulvm.PUSH,
+				Operand: *uint256.NewInt(1),
+			})
+		} else {
+			easm.pushInstruction(eulvm.Instruction{
+				OpCode: eulvm.PUSH,
+			})
+		}
 	default:
 		panic("unsupported expression kind")
 	}
