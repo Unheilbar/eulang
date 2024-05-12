@@ -5,6 +5,7 @@ import (
 	"log"
 	"os"
 	"regexp"
+	"strconv"
 	"strings"
 )
 
@@ -178,11 +179,14 @@ func (lex *lexer) tokenByPassPeekBuffer(t *token) bool {
 		}
 	}
 
-	// Name token
+	// Name token and Number tokens
 	{
 		nameToken := chopUntil(lex.current, isName)
 		if len(nameToken) != 0 && strings.HasPrefix(lex.current, nameToken) {
 			*t = lex.chopToken(eulTokenKindName, len(nameToken))
+			if isNumber(t.view) {
+				t.kind = eulTokenKindNumber
+			}
 			return true
 		}
 	}
@@ -323,10 +327,15 @@ func chopUntil(s string, until func(r rune) bool) string {
 	return s
 }
 
+func isNumber(str string) bool {
+	_, err := strconv.Atoi(str)
+	return err == nil
+}
+
 func isName(r rune) bool {
 	return ('a' <= r && r <= 'z') ||
 		('A' <= r && r <= 'Z') ||
-		('0' < r && r < '9') ||
+		('0' <= r && r <= '9') ||
 		'_' == r
 
 }

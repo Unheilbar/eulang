@@ -2,7 +2,11 @@ package compiler
 
 import (
 	"log"
+	"strconv"
 )
+
+// TODO not all types of nodes of AST have locations
+// need to implement locations for better compiling reports;
 
 type eulFuncCallArg struct {
 	value eulExpr
@@ -22,6 +26,7 @@ type eulExprAs struct {
 	strLit   string
 	funcCall eulFuncCall
 	boolean  bool
+	intLit   int64
 	//... to be continued
 }
 
@@ -44,11 +49,12 @@ const (
 	eulExprKindStrLit eulExprKind = iota
 	eulExprKindBoolLit
 	eulExprKindFuncCall
-
+	eulExprKindIntLit
 	//... to be continued
 )
 
 type eulExpr struct {
+	loc  eulLoc
 	kind eulExprKind
 	as   eulExprAs
 }
@@ -98,6 +104,7 @@ type eulVarDef struct {
 type eulVarAssign struct {
 	name  string
 	value eulExpr
+	loc   eulLoc
 }
 
 type eulTopKind uint8
@@ -149,10 +156,6 @@ func parseEulModule(lex *lexer) eulModule {
 	}
 
 	return mod
-}
-
-func parseEulTop(lex *lexer) eulTop {
-	return eulTop{}
 }
 
 func parseVarDef(lex *lexer) eulVarDef {
@@ -286,8 +289,9 @@ func parseVarAssign(lex *lexer) eulVarAssign {
 	var vas eulVarAssign
 
 	vas.name = lex.expectToken(eulTokenKindName).view
-	lex.expectToken(eulTokenKindEq)
+	t := lex.expectToken(eulTokenKindEq)
 	vas.value = parseEulExpr(lex)
+	vas.loc = t.loc
 	return vas
 }
 
@@ -306,12 +310,15 @@ func parseEulExpr(lex *lexer) eulExpr {
 			lex.next(&t)
 			expr.as.boolean = true
 			expr.kind = eulExprKindBoolLit
+			expr.loc = t.loc
 		} else if t.view == "false" {
 			lex.next(&t)
 			expr.as.boolean = false
 			expr.kind = eulExprKindBoolLit
+			expr.loc = t.loc
 		} else {
 			funcall := parseFuncCall(lex)
+			expr.loc = t.loc
 			expr.kind = eulExprKindFuncCall
 			expr.as.funcCall = funcall
 		}
@@ -319,7 +326,12 @@ func parseEulExpr(lex *lexer) eulExpr {
 		strLit := parseStrLit(lex)
 		expr.kind = eulExprKindStrLit
 		expr.as.strLit = strLit
-
+		expr.loc = t.loc
+	case eulTokenKindNumber:
+		intLit := parseIntLit(lex)
+		expr.kind = eulExprKindIntLit
+		expr.as.intLit = intLit
+		expr.loc = t.loc
 	// TODO cases of other token kinds
 	default:
 		log.Fatalf("%s:%d:%d no expression starts with %s", lex.filepath, lex.row, lex.lineStart, t.view)
@@ -360,4 +372,12 @@ func parseEulType(lex *lexer) eulType {
 
 func parseStrLit(lex *lexer) string {
 	return lex.expectToken(eulTokenKindLitStr).view
+}
+
+func parseIntLit(lex *lexer) int64 {
+	intLit, err := strconv.Atoi(lex.expectToken(eulTokenKindNumber).view)
+	if err != nil {
+		panic("parse int lit invalid call")
+	}
+	return int64(intLit)
 }

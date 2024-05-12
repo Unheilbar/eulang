@@ -2,6 +2,7 @@ package compiler
 
 import (
 	"fmt"
+	"log"
 
 	"github.com/Unheilbar/eulang/eulvm"
 	"github.com/holiman/uint256"
@@ -95,10 +96,10 @@ func (e *eulang) compileWhileIntoEasm(easm *easm, w eulWhile) {
 
 func (e *eulang) compileVarAssignIntoEasm(easm *easm, expr eulVarAssign) {
 	vari, ok := e.gvars[expr.name]
-	//TODO fix assignment non-existing variables
 
 	if !ok {
-		panic("TODO add here proper log message")
+		log.Fatalf("%s:%d:%d ERROR cannot assign not declared variable '%s'",
+			expr.loc.filepath, expr.loc.row, expr.loc.col, expr.name)
 	}
 
 	easm.pushInstruction(eulvm.Instruction{
@@ -176,6 +177,11 @@ func (e *eulang) compileExprIntoEasm(easm *easm, expr eulExpr) {
 		}
 
 		easm.pushInstruction(pushStrSizeInst)
+	case eulExprKindIntLit:
+		easm.pushInstruction(eulvm.Instruction{
+			OpCode:  eulvm.PUSH,
+			Operand: *uint256.NewInt(uint64(expr.as.intLit)),
+		})
 	case eulExprKindBoolLit:
 		if expr.as.boolean {
 			easm.pushInstruction(eulvm.Instruction{

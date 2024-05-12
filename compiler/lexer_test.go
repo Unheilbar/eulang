@@ -10,6 +10,7 @@ func Test_LexNext(t *testing.T) {
 		"    ",
 		"  ",
 		"    func main () {",
+		"   i = 0;",
 		`       event("hello");`,
 		"}",
 	}
