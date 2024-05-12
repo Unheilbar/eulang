@@ -112,6 +112,22 @@ func (e *eulang) compileVarAssignIntoEasm(easm *easm, expr eulVarAssign) {
 	})
 }
 
+func (e *eulang) compileVarReadIntoEasm(easm *easm, expr varRead) {
+	glVar, ok := e.gvars[expr.name]
+	if !ok {
+		log.Fatalf("%s:%d:%d ERROR cannot read not declared variable '%s'",
+			expr.loc.filepath, expr.loc.row, expr.loc.col, expr.name)
+	}
+
+	easm.pushInstruction(eulvm.Instruction{
+		OpCode:  eulvm.PUSH,
+		Operand: glVar.addr,
+	})
+	easm.pushInstruction(eulvm.Instruction{
+		OpCode: eulvm.MLOAD,
+	})
+}
+
 func (e *eulang) compileIfIntoEasm(easm *easm, eif eulIf) {
 
 	e.compileExprIntoEasm(easm, eif.condition)
@@ -168,7 +184,6 @@ func (e *eulang) compileExprIntoEasm(easm *easm, expr eulExpr) {
 			OpCode:  eulvm.PUSH,
 			Operand: addr,
 		}
-
 		easm.pushInstruction(pushStrAddrInst)
 
 		pushStrSizeInst := eulvm.Instruction{
@@ -193,6 +208,8 @@ func (e *eulang) compileExprIntoEasm(easm *easm, expr eulExpr) {
 				OpCode: eulvm.PUSH,
 			})
 		}
+	case eulExprKindVarRead:
+		e.compileVarReadIntoEasm(easm, expr.as.varRead)
 	default:
 		panic("unsupported expression kind")
 	}

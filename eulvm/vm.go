@@ -64,7 +64,7 @@ func executeNext(e *EulVM) error {
 
 	inst := e.program[e.ip]
 
-	fmt.Println(e.ip, "-->call", OpCodes[inst.OpCode], "operand", inst.Operand.Uint64())
+	//fmt.Println(e.ip, "-->call", OpCodes[inst.OpCode], "operand", inst.Operand.Uint64())
 	switch inst.OpCode {
 	case PUSH:
 		e.stackSize++
@@ -135,8 +135,8 @@ func executeNext(e *EulVM) error {
 		e.ip++
 		return e.execNative(inst.Operand.Uint64())
 	case MSTORE256:
-		offset := e.stack[e.stackSize].Uint64()
-		val := e.stack[e.stackSize-1]
+		offset := e.stack[e.stackSize-1].Uint64()
+		val := e.stack[e.stackSize]
 		e.memory.Set32(offset, val)
 		e.stackSize -= 2
 		e.ip++
@@ -180,6 +180,7 @@ func (e *EulVM) Dump() {
 		fmt.Println(e.stack[i])
 	}
 	fmt.Println("-----dump-----")
+	e.memory.Dump()
 }
 
 // euler native functions

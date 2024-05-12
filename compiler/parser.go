@@ -5,9 +5,6 @@ import (
 	"strconv"
 )
 
-// TODO not all types of nodes of AST have locations
-// need to implement locations for better compiling reports;
-
 type eulFuncCallArg struct {
 	value eulExpr
 	//TODO probably makes sense to represent it as linked list so we can iterate through arguments
@@ -27,6 +24,7 @@ type eulExprAs struct {
 	funcCall eulFuncCall
 	boolean  bool
 	intLit   int64
+	varRead  varRead
 	//... to be continued
 }
 
@@ -50,6 +48,7 @@ const (
 	eulExprKindBoolLit
 	eulExprKindFuncCall
 	eulExprKindIntLit
+	eulExprKindVarRead
 	//... to be continued
 )
 
@@ -105,6 +104,11 @@ type eulVarAssign struct {
 	name  string
 	value eulExpr
 	loc   eulLoc
+}
+
+type varRead struct {
+	name string
+	loc  eulLoc
 }
 
 type eulTopKind uint8
@@ -317,10 +321,18 @@ func parseEulExpr(lex *lexer) eulExpr {
 			expr.kind = eulExprKindBoolLit
 			expr.loc = t.loc
 		} else {
-			funcall := parseFuncCall(lex)
-			expr.loc = t.loc
-			expr.kind = eulExprKindFuncCall
-			expr.as.funcCall = funcall
+			var nextTok token
+			if lex.peek(&nextTok, 1) && nextTok.kind == eulTokenKindOpenParen {
+				funcall := parseFuncCall(lex)
+				expr.loc = t.loc
+				expr.kind = eulExprKindFuncCall
+				expr.as.funcCall = funcall
+			} else {
+				expr.kind = eulExprKindVarRead
+				expr.loc = t.loc
+				expr.as.varRead = parseVarRead(lex)
+			}
+
 		}
 	case eulTokenKindLitStr:
 		strLit := parseStrLit(lex)
@@ -350,6 +362,14 @@ func parseFuncCall(lex *lexer) eulFuncCall {
 	funcCall.args = parseFuncCallArgs(lex)
 
 	return funcCall
+}
+
+func parseVarRead(lex *lexer) varRead {
+	var vr varRead
+	t := lex.expectToken(eulTokenKindName)
+	vr.name = t.view
+	vr.loc = t.loc
+	return vr
 }
 
 func parseFuncCallArgs(lex *lexer) []eulFuncCallArg {

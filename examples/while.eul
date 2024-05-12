@@ -2,11 +2,10 @@
 var i: i64;
 
 func main() { 
-	i = 10; 	
-	//while i<10 {
-	//	write("hello from euler");
-	//	i = i + 1;
-	//}
-	
-	write("end lets test long strings that a bigger than 32 bytes!!!!!! this string is much longer than 32 bytes and it still prints");
+	i = 0;
+	while i<10 {
+		i = i + 1;
+		write("hello from euler");
+	}
+	write("hello this is eulang. golang embedded interpreter language! and this string is longer than 32 bytes which kind of important for my test case");
 } 
