@@ -1,10 +1,10 @@
 func main(){
-	if (true) {
-		write("eulang rules");
-		write("then second statement");
-  	} else {
+    if (true) {
+	write("eulang rules");
+	write("then second statement");
+    } else {
     	write ("eulang sucks");
     	write ("else second statement");
-  }
-  write("i've passed else");
+    }
+    write("i've passed else");
 } 

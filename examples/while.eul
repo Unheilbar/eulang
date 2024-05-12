@@ -1,0 +1,11 @@
+//TODO add support for other types later
+var i: i64;
+
+func main() { 
+	//i = 0; 	
+	//while i < 10 {
+	//	write("hello from euler");
+	//	i = i + 1;
+	//}
+	write("end lets test long strings that a bigger than 32 bytes!!!!!! this string is much longer than 32 bytes and it still prints");
+} 

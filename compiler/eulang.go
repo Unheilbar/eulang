@@ -7,25 +7,47 @@ import (
 	"github.com/holiman/uint256"
 )
 
+type eulGlobalVar struct {
+	addr uint256.Int //offset inside of preallocated memory
+	name string
+}
+
 type compiledFuncs struct{}
 
 // eulang stores all the context of euler compiler (compiled functions, scopes, etc.)
 type eulang struct {
 	funcs []compiledFuncs
+
+	// TODO maybe better make a map [name]>globalVar
+	gvars []eulGlobalVar
 }
 
 func NewEulang() *eulang {
 	return &eulang{}
 }
 
-func (e *eulang) compileFuncCallIntoEasm(easm *easm, fd eulFuncDef) {
-	for _, statement := range fd.body.statements {
-		e.compileStatementIntoEasm(easm, statement)
+func (e *eulang) compileModuleIntoEasm(easm *easm, module eulModule) {
+	for _, top := range module.tops {
+		switch top.kind {
+		case eulTopKindFunc:
+			e.compileFuncDefIntoEasm(easm, top.as.fdef)
+		case eulTopKindVar:
+			e.compileVarDefIntoEasm(easm, top.as.vdef)
+		default:
+			panic("try to compile unexpected top kind")
+		}
 	}
 }
 
-// TODO temp later should be public
-func (e *eulang) CompileFuncCallIntoEasm(easm *easm, fd eulFuncDef) {
+func (e *eulang) compileVarDefIntoEasm(easm *easm, vd eulVarDef) {
+	var gv eulGlobalVar
+	gv.addr = easm.pushByteArrToMemory([]byte{0})
+	gv.name = vd.name
+
+	e.gvars = append(e.gvars, gv)
+}
+
+func (e *eulang) compileFuncDefIntoEasm(easm *easm, fd eulFuncDef) {
 	for _, statement := range fd.body.statements {
 		e.compileStatementIntoEasm(easm, statement)
 	}
@@ -86,21 +108,11 @@ func (e *eulang) compileExprIntoEasm(easm *easm, expr eulExpr) {
 				OpCode:  eulvm.OpCode(eulvm.NATIVE),
 				Operand: *uint256.NewInt(eulvm.NativeWrite),
 			})
-		} else if expr.as.funcCall.name == "true" {
-			easm.pushInstruction(eulvm.Instruction{
-				OpCode:  eulvm.PUSH,
-				Operand: *uint256.NewInt(1),
-			})
-		} else if expr.as.funcCall.name == "false" {
-			easm.pushInstruction(eulvm.Instruction{
-				OpCode: eulvm.PUSH,
-			})
 		} else {
 			panic("unexpected name")
 		}
 	case eulExprKindStrLit:
 		var addr eulvm.Word = easm.pushStringToMemory(expr.as.strLit)
-
 		pushStrAddrInst := eulvm.Instruction{
 			OpCode:  eulvm.PUSH,
 			Operand: addr,

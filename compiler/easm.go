@@ -30,16 +30,18 @@ func (e *easm) translateSource(filepath string, program []eulvm.Program) {
 
 // returns the address of the word in the memory
 func (e *easm) pushStringToMemory(str string) eulvm.Word {
-	var result eulvm.Word
+	return e.pushByteArrToMemory([]byte(str))
+}
 
+func (e *easm) pushByteArrToMemory(arr []byte) eulvm.Word {
 	memSize := e.memory.Size()
-	words := strToWords(str)
+	words := arrToWords(arr)
 
 	if int(memSize)+len(words)*32 > eulvm.MemoryCapacity {
 		log.Fatal("memory limit exceeded. Increase memory limit in virtual machine")
 	}
 
-	result = *uint256.NewInt(uint64(memSize))
+	result := *uint256.NewInt(uint64(memSize))
 
 	for _, word := range words {
 		e.memory.Set32(uint64(e.memory.Size()), word)
@@ -74,6 +76,27 @@ func strToWords(str string) []eulvm.Word {
 		var word eulvm.Word
 		var b [32]byte
 		copy(b[:], []byte(str))
+		word.SetBytes32(b[:])
+		words = append(words, word)
+	}
+
+	return words
+}
+
+func arrToWords(arr []byte) []eulvm.Word {
+	words := make([]eulvm.Word, 0)
+	offset := 0
+	step := 32
+	for offset+step < len(arr) {
+		var word eulvm.Word
+		word.SetBytes(arr[offset : offset+step])
+		offset += step
+		words = append(words, word)
+	}
+	if offset < len(arr) {
+		var word eulvm.Word
+		var b [32]byte
+		copy(b[:], arr[offset:])
 		word.SetBytes32(b[:])
 		words = append(words, word)
 	}

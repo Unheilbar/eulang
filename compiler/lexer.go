@@ -4,6 +4,7 @@ import (
 	"bufio"
 	"log"
 	"os"
+	"regexp"
 	"strings"
 )
 
@@ -135,8 +136,11 @@ func NewLexerFromFile(filename string) *lexer {
 
 	// FIXME doesn't work without it
 	content = append(content, " ")
+	re, _ := regexp.Compile("//.*")
 	for scanner.Scan() {
-		content = append(content, strings.ReplaceAll(scanner.Text(), "	", " "))
+		line := strings.ReplaceAll(scanner.Text(), "	", " ")
+		line = string(re.ReplaceAll([]byte(line), []byte("")))
+		content = append(content, line)
 	}
 
 	return NewLexer(content, filename)
@@ -187,7 +191,7 @@ func (lex *lexer) peek(t *token) bool {
 	// TODO doesn't trim tabs
 	lex.current = strings.TrimLeft(lex.current, " ")
 
-	for len(lex.current) == 0 && len(lex.content) > 0 {
+	for len(lex.current) == 0 && len(lex.content) > 1 {
 		lex.nextLine()
 	}
 

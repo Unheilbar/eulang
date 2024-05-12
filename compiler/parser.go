@@ -51,7 +51,7 @@ type eulStmtKind uint8
 
 const (
 	eulStmtKindExpr eulStmtKind = iota
-	eulStmtKindIf               = iota
+	eulStmtKindIf
 )
 
 type eulStatementAs struct {
@@ -73,7 +73,91 @@ type eulFuncDef struct {
 	body eulBlock
 }
 
-func ParseFuncDef(lex *lexer) eulFuncDef {
+type eulType uint8
+
+const (
+	eulTypei64 eulType = iota
+)
+
+type eulVarDef struct {
+	name  string
+	etype eulType
+	loc   eulLoc
+}
+
+type eulTopKind uint8
+
+const (
+	eulTopKindFunc = iota
+	eulTopKindVar
+)
+
+type eulTopAs struct {
+	vdef eulVarDef
+	fdef eulFuncDef
+}
+
+type eulTop struct {
+	kind eulTopKind
+	as   eulTopAs
+}
+
+type eulModule struct {
+	tops []eulTop
+}
+
+func parseEulModule(lex *lexer) eulModule {
+	var mod eulModule
+	var t token
+	for lex.peek(&t) {
+		if t.kind != eulTokenKindName {
+			log.Fatalf("%s:%d:%d expected var or func definition but got %s", t.loc.filepath, t.loc.row, t.loc.col, tokenKindNames[t.kind])
+		}
+
+		var top eulTop
+		switch t.view {
+		case "func":
+			fdef := parseFuncDef(lex)
+
+			top.as.fdef = fdef
+			top.kind = eulTopKindFunc
+
+		case "var":
+			vdef := parseVarDef(lex)
+
+			top.as.vdef = vdef
+			top.kind = eulTopKindVar
+		default:
+			log.Fatalf("%s:%d:%d expected module definitions but got keyword %s", t.loc.filepath, t.loc.row, t.loc.col, t.view)
+		}
+		mod.tops = append(mod.tops, top)
+	}
+
+	return mod
+}
+
+func parseEulTop(lex *lexer) eulTop {
+	return eulTop{}
+}
+
+func parseVarDef(lex *lexer) eulVarDef {
+	// eulang:
+	// var i: i32;
+	//
+	var vdef eulVarDef
+
+	lex.expectKeyword("var")
+	t := lex.expectToken(eulTokenKindName)
+	vdef.loc = t.loc
+	vdef.name = t.view
+	lex.expectToken(eulTokenKindColon)
+	vdef.etype = parseEulType(lex)
+	lex.expectToken(eulTokenKindSemicolon)
+
+	return vdef
+}
+
+func parseFuncDef(lex *lexer) eulFuncDef {
 	//var module can be used in the future
 	var f eulFuncDef
 	lex.expectKeyword("func")
@@ -166,20 +250,15 @@ func parseEulExpr(lex *lexer) eulExpr {
 			lex.next(&t)
 			expr.as.boolean = false
 			expr.kind = eulExprKindBoolLit
-		} else if t.view == "false" {
 		} else {
 			funcall := parseFuncCall(lex)
 			expr.kind = eulExprKindFuncCall
-			expr.as = eulExprAs{
-				funcCall: funcall,
-			}
+			expr.as.funcCall = funcall
 		}
 	case eulTokenKindLitStr:
 		strLit := parseStrLit(lex)
 		expr.kind = eulExprKindStrLit
-		expr.as = eulExprAs{
-			strLit: strLit,
-		}
+		expr.as.strLit = strLit
 
 	// TODO cases of other token kinds
 	default:
@@ -210,6 +289,13 @@ func parseFuncCallArgs(lex *lexer) []eulFuncCallArg {
 	res = append(res, eulFuncCallArg{arg})
 	lex.expectToken(eulTokenKindCloseParen)
 	return res
+}
+
+func parseEulType(lex *lexer) eulType {
+	//TODO Euler implement other types here later
+	lex.expectKeyword("i64")
+
+	return eulTypei64
 }
 
 func parseStrLit(lex *lexer) string {
