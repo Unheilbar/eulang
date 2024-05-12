@@ -19,11 +19,13 @@ type eulang struct {
 	funcs []compiledFuncs
 
 	// TODO maybe better make a map [name]>globalVar
-	gvars []eulGlobalVar
+	gvars map[string]eulGlobalVar
 }
 
 func NewEulang() *eulang {
-	return &eulang{}
+	return &eulang{
+		gvars: make(map[string]eulGlobalVar),
+	}
 }
 
 func (e *eulang) compileModuleIntoEasm(easm *easm, module eulModule) {
@@ -39,12 +41,13 @@ func (e *eulang) compileModuleIntoEasm(easm *easm, module eulModule) {
 	}
 }
 
+// TODO we don't check uniquness of global variables yet
 func (e *eulang) compileVarDefIntoEasm(easm *easm, vd eulVarDef) {
 	var gv eulGlobalVar
 	gv.addr = easm.pushByteArrToMemory([]byte{0})
 	gv.name = vd.name
 
-	e.gvars = append(e.gvars, gv)
+	e.gvars[gv.name] = gv
 }
 
 func (e *eulang) compileFuncDefIntoEasm(easm *easm, fd eulFuncDef) {
@@ -59,9 +62,53 @@ func (e *eulang) compileStatementIntoEasm(easm *easm, stmt eulStatement) {
 		e.compileExprIntoEasm(easm, stmt.as.expr)
 	case eulStmtKindIf:
 		e.compileIfIntoEasm(easm, stmt.as.eif)
+	case eulStmtKindVarAssign:
+		e.compileVarAssignIntoEasm(easm, stmt.as.varAssign)
+	case eulStmtKindWhile:
+		e.compileWhileIntoEasm(easm, stmt.as.while)
 	default:
 		panic(fmt.Sprintf("stmt kind doesn't exist kind %d", stmt.kind))
 	}
+}
+
+func (e *eulang) compileWhileIntoEasm(easm *easm, w eulWhile) {
+	condAddr := easm.program.Size()
+	e.compileExprIntoEasm(easm, w.condition)
+	easm.PushInstruction(eulvm.Instruction{
+		OpCode: eulvm.NOT,
+	})
+
+	jumpWhileAddr := easm.PushInstruction(eulvm.Instruction{
+		OpCode: eulvm.JUMPI,
+	})
+
+	e.compileBlockIntoEasm(easm, &w.body)
+	easm.PushInstruction(eulvm.Instruction{
+		OpCode:  eulvm.JUMPDEST,
+		Operand: *uint256.NewInt(uint64(condAddr)),
+	})
+	bodyEnd := easm.program.Size()
+
+	// resolve deferred
+	easm.program.Instrutions[jumpWhileAddr].Operand = *uint256.NewInt(uint64(bodyEnd))
+}
+
+func (e *eulang) compileVarAssignIntoEasm(easm *easm, expr eulVarAssign) {
+	vari, ok := e.gvars[expr.name]
+	//TODO fix assignment non-existing variables
+
+	if !ok {
+		panic("TODO add here proper log message")
+	}
+
+	easm.pushInstruction(eulvm.Instruction{
+		OpCode:  eulvm.PUSH,
+		Operand: vari.addr,
+	})
+	e.compileExprIntoEasm(easm, expr.value)
+	easm.pushInstruction(eulvm.Instruction{
+		OpCode: eulvm.MSTORE256,
+	})
 }
 
 func (e *eulang) compileIfIntoEasm(easm *easm, eif eulIf) {
@@ -89,13 +136,16 @@ func (e *eulang) compileIfIntoEasm(easm *easm, eif eulIf) {
 	easm.program.Instrutions[jmpElseAddr].Operand = *uint256.NewInt(uint64(endAddr))
 }
 
-func (e *eulang) compileBlockIntoEasm(easm *easm, block *eulBlock) {
+// returns address of the end of the block
+func (e *eulang) compileBlockIntoEasm(easm *easm, block *eulBlock) int {
 	if block == nil {
-		return
+		return easm.program.Size()
 	}
 	for _, stmt := range block.statements {
 		e.compileStatementIntoEasm(easm, stmt)
 	}
+
+	return easm.program.Size()
 }
 
 func (e *eulang) compileExprIntoEasm(easm *easm, expr eulExpr) {

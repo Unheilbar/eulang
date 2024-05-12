@@ -17,21 +17,13 @@ func Test_LexNext(t *testing.T) {
 	lex := NewLexer(code, "testfile")
 	var tok = &token{}
 	//lex.next(tok)
-	lim := 10
+	lim := 12
+	lex.peek(tok, 1)
+
 	for lex.next(tok) && lim > 0 {
 		lim--
 		fmt.Println("view", tok.view, "\tkind", tokenKindNames[tok.kind])
 	}
-	//expTok := &token{
-	//	kind: eulTokenKindName,
-	//	view: "func",
-	//	loc: eulLoc{
-	//		row:      2,
-	//		col:      4,
-	//		filepath: "testfile",
-	//	},
-	//}
 
-	//assert.Equal(t, expTok, tok)
 	lex.next(tok)
 }

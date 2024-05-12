@@ -25,6 +25,12 @@ type eulExprAs struct {
 	//... to be continued
 }
 
+type eulWhile struct {
+	loc       eulLoc
+	condition eulExpr
+	body      eulBlock
+}
+
 type eulIf struct {
 	loc       eulLoc
 	condition eulExpr
@@ -52,11 +58,15 @@ type eulStmtKind uint8
 const (
 	eulStmtKindExpr eulStmtKind = iota
 	eulStmtKindIf
+	eulStmtKindVarAssign
+	eulStmtKindWhile
 )
 
 type eulStatementAs struct {
-	expr eulExpr
-	eif  eulIf
+	expr      eulExpr
+	eif       eulIf
+	varAssign eulVarAssign
+	while     eulWhile
 }
 
 type eulStatement struct {
@@ -85,6 +95,11 @@ type eulVarDef struct {
 	loc   eulLoc
 }
 
+type eulVarAssign struct {
+	name  string
+	value eulExpr
+}
+
 type eulTopKind uint8
 
 const (
@@ -109,7 +124,7 @@ type eulModule struct {
 func parseEulModule(lex *lexer) eulModule {
 	var mod eulModule
 	var t token
-	for lex.peek(&t) {
+	for lex.peek(&t, 0) {
 		if t.kind != eulTokenKindName {
 			log.Fatalf("%s:%d:%d expected var or func definition but got %s", t.loc.filepath, t.loc.row, t.loc.col, tokenKindNames[t.kind])
 		}
@@ -169,6 +184,21 @@ func parseFuncDef(lex *lexer) eulFuncDef {
 	return f
 }
 
+func parseEulWhile(lex *lexer) eulWhile {
+	var while eulWhile
+
+	//Parse while
+	{
+		t := lex.expectKeyword("while")
+		while.loc = t.loc
+
+		while.condition = parseEulExpr(lex)
+		while.body = *parseCurlyEulBlock(lex)
+	}
+
+	return while
+}
+
 func parseEulIf(lex *lexer) eulIf {
 	var eif eulIf
 	// Parse then
@@ -185,7 +215,7 @@ func parseEulIf(lex *lexer) eulIf {
 	// Parse else if exists
 	{
 		var t token
-		if lex.peek(&t) && t.kind == eulTokenKindName && t.view == "else" {
+		if lex.peek(&t, 0) && t.kind == eulTokenKindName && t.view == "else" {
 			lex.next(&t)
 			eif.elze = parseCurlyEulBlock(lex)
 		}
@@ -197,16 +227,37 @@ func parseEulIf(lex *lexer) eulIf {
 func parseEulStmt(lex *lexer) eulStatement {
 
 	var t token
-	if !lex.peek(&t) {
+	if !lex.peek(&t, 0) {
 		log.Fatalf("%s:%d:%d expected statement but got EOF", lex.filepath, lex.row, lex.lineStart)
 	}
 
-	if t.kind == eulTokenKindName && t.view == "if" {
-		var stmt eulStatement
-		stmt.kind = eulStmtKindIf
-		stmt.as.eif = parseEulIf(lex)
-		return stmt
+	switch t.kind {
+	case eulTokenKindName:
+		switch t.view {
+		case "if":
+			var stmt eulStatement
+			stmt.kind = eulStmtKindIf
+			stmt.as.eif = parseEulIf(lex)
+			return stmt
+		case "while":
+			var stmt eulStatement
+			stmt.kind = eulStmtKindWhile
+			stmt.as.while = parseEulWhile(lex)
+			return stmt
+		default:
+			var nt token
+			if lex.peek(&nt, 1) && nt.kind == eulTokenKindEq {
+				var stmt eulStatement
+				stmt.kind = eulStmtKindVarAssign
+
+				stmt.as.varAssign = parseVarAssign(lex)
+				lex.expectToken(eulTokenKindSemicolon)
+				return stmt
+			}
+		}
 	}
+
+	// if it's still there then just parse it as a statement
 
 	var stmt eulStatement
 	stmt.kind = eulStmtKindExpr
@@ -221,7 +272,7 @@ func parseCurlyEulBlock(lex *lexer) *eulBlock {
 	var t = &token{}
 	var result eulBlock
 
-	for lex.peek(t) && t.kind != eulTokenKindCloseCurly {
+	for lex.peek(t, 0) && t.kind != eulTokenKindCloseCurly {
 		result.statements = append(result.statements, parseEulStmt(lex))
 
 	}
@@ -231,10 +282,19 @@ func parseCurlyEulBlock(lex *lexer) *eulBlock {
 	return &result
 }
 
+func parseVarAssign(lex *lexer) eulVarAssign {
+	var vas eulVarAssign
+
+	vas.name = lex.expectToken(eulTokenKindName).view
+	lex.expectToken(eulTokenKindEq)
+	vas.value = parseEulExpr(lex)
+	return vas
+}
+
 func parseEulExpr(lex *lexer) eulExpr {
 	var t token
 
-	if !lex.peek(&t) {
+	if !lex.peek(&t, 0) {
 		log.Fatalf("%s:%d:%d expected expression but got EOF", lex.filepath, lex.row, lex.lineStart)
 	}
 

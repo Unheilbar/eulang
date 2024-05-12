@@ -7,5 +7,8 @@ func main() {
 	//	write("hello from euler");
 	//	i = i + 1;
 	//}
+	while true {
+		write("hello");
+	}
 	write("end lets test long strings that a bigger than 32 bytes!!!!!! this string is much longer than 32 bytes and it still prints");
 } 
