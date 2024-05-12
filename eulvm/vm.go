@@ -150,6 +150,16 @@ func executeNext(e *EulVM) error {
 		e.stack[e.stackSize].SetBytes(e.memory.store[addr:32])
 		e.ip++
 		return nil
+	case LT:
+		x := e.stack[e.stackSize]
+		e.stackSize--
+		if x.Lt(&e.stack[e.stackSize]) {
+			e.stack[e.stackSize].SetOne()
+		} else {
+			e.stack[e.stackSize].Clear()
+		}
+		e.ip++
+		return nil
 	case NOP:
 		e.ip++
 		return nil

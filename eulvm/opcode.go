@@ -52,6 +52,7 @@ var OpCodesView = map[string]OpCode{
 	"MLOAD256":  MLOAD256,
 	"NATIVE":    NATIVE,
 	"NOT":       NOT,
+	"LT":        LT,
 }
 
 var OpCodes = map[OpCode]string{
@@ -71,4 +72,5 @@ var OpCodes = map[OpCode]string{
 	MLOAD256:  "MLOAD256",
 	NATIVE:    "NATIVE",
 	NOT:       "NOT",
+	LT:        "LT",
 }

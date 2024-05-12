@@ -1,11 +1,13 @@
-//TODO add support for other types later
+// TODO add support for other types later
 var i: i64;
 
-func main() { 
+func main() {
+	// TODO add support for local variables
 	i = 0;
-	while i<10 {
+	while i<5 {
 		i = i + 1;
-		write("hello from euler");
+		write("wait a while");
 	}
-	write("hello this is eulang. golang embedded interpreter language! and this string is longer than 32 bytes which kind of important for my test case");
-} 
+
+	write("hello this is eulang. golang embedded interpreter programming language! and this string is longer than 32 bytes which kind of important for my test case");
+}

@@ -5,6 +5,11 @@ import (
 	"strconv"
 )
 
+var binaryOpTokens = map[eulBinaryOpKind]uint8{
+	binaryOpLess: eulTokenKindLt,
+	binaryOpPlus: eulTokenKindPlus,
+}
+
 type eulFuncCallArg struct {
 	value eulExpr
 	//TODO probably makes sense to represent it as linked list so we can iterate through arguments
@@ -19,14 +24,6 @@ type eulFuncCall struct {
 
 // NOTE eulang another potential use case for union
 // NOTE eulang also potentially can be using interface
-type eulExprAs struct {
-	strLit   string
-	funcCall eulFuncCall
-	boolean  bool
-	intLit   int64
-	varRead  varRead
-	//... to be continued
-}
 
 type eulWhile struct {
 	loc       eulLoc
@@ -49,8 +46,19 @@ const (
 	eulExprKindFuncCall
 	eulExprKindIntLit
 	eulExprKindVarRead
+	eulExprKindBinaryOp
 	//... to be continued
 )
+
+type eulExprAs struct {
+	strLit   string
+	funcCall eulFuncCall
+	boolean  bool
+	intLit   int64
+	varRead  varRead
+	binaryOp *binaryOp
+	//... to be continued
+}
 
 type eulExpr struct {
 	loc  eulLoc
@@ -109,6 +117,23 @@ type eulVarAssign struct {
 type varRead struct {
 	name string
 	loc  eulLoc
+}
+
+type eulBinaryOpKind uint8
+
+const (
+	binaryOpPlus eulBinaryOpKind = iota
+	binaryOpLess
+
+	countBinaryOpKinds //keep it last
+)
+
+type binaryOp struct {
+	loc  eulLoc
+	kind eulBinaryOpKind
+	lhs  eulExpr
+	rhs  eulExpr
+	// TODO
 }
 
 type eulTopKind uint8
@@ -299,7 +324,7 @@ func parseVarAssign(lex *lexer) eulVarAssign {
 	return vas
 }
 
-func parseEulExpr(lex *lexer) eulExpr {
+func parsePrimaryExpr(lex *lexer) eulExpr {
 	var t token
 
 	if !lex.peek(&t, 0) {
@@ -332,7 +357,6 @@ func parseEulExpr(lex *lexer) eulExpr {
 				expr.loc = t.loc
 				expr.as.varRead = parseVarRead(lex)
 			}
-
 		}
 	case eulTokenKindLitStr:
 		strLit := parseStrLit(lex)
@@ -346,11 +370,45 @@ func parseEulExpr(lex *lexer) eulExpr {
 		expr.loc = t.loc
 	// TODO cases of other token kinds
 	default:
-		log.Fatalf("%s:%d:%d no expression starts with %s", lex.filepath, lex.row, lex.lineStart, t.view)
+		log.Fatalf("%s:%d:%d no primary expression starts with %s",
+			lex.filepath, lex.row, lex.lineStart, t.view)
 
 	}
 
 	return expr
+}
+
+func parseEulExpr(lex *lexer) eulExpr {
+	lhs := parsePrimaryExpr(lex)
+
+	var t token
+	if lex.peek(&t, 0) {
+		for kind := eulBinaryOpKind(0); kind < countBinaryOpKinds; kind++ {
+			if binaryOpTokens[kind] == t.kind {
+				ok := lex.next(&t)
+				if !ok {
+					panic("your lexer is broken!!1111")
+				}
+				var binOp binaryOp
+
+				// Initialize binary op
+				{
+					binOp.loc = t.loc
+					binOp.kind = kind
+					binOp.lhs = lhs
+
+					binOp.rhs = parseEulExpr(lex)
+				}
+
+				var expr eulExpr
+				expr.kind = eulExprKindBinaryOp
+				expr.as.binaryOp = &binOp
+				return expr
+			}
+		}
+	}
+
+	return lhs
 }
 
 func parseFuncCall(lex *lexer) eulFuncCall {

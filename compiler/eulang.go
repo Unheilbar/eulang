@@ -112,6 +112,25 @@ func (e *eulang) compileVarAssignIntoEasm(easm *easm, expr eulVarAssign) {
 	})
 }
 
+func (e *eulang) compileBinaryOpIntoEasm(easm *easm, binOp binaryOp) {
+	switch binOp.kind {
+	case binaryOpLess:
+		e.compileExprIntoEasm(easm, binOp.rhs)
+		e.compileExprIntoEasm(easm, binOp.lhs)
+		easm.pushInstruction(eulvm.Instruction{
+			OpCode: eulvm.LT,
+		})
+	case binaryOpPlus:
+		e.compileExprIntoEasm(easm, binOp.lhs)
+		e.compileExprIntoEasm(easm, binOp.rhs)
+		easm.pushInstruction(eulvm.Instruction{
+			OpCode: eulvm.ADD,
+		})
+	default:
+		panic("compiling bin op unreachable")
+	}
+}
+
 func (e *eulang) compileVarReadIntoEasm(easm *easm, expr varRead) {
 	glVar, ok := e.gvars[expr.name]
 	if !ok {
@@ -190,7 +209,6 @@ func (e *eulang) compileExprIntoEasm(easm *easm, expr eulExpr) {
 			OpCode:  eulvm.PUSH,
 			Operand: *uint256.NewInt(uint64(len(expr.as.strLit))),
 		}
-
 		easm.pushInstruction(pushStrSizeInst)
 	case eulExprKindIntLit:
 		easm.pushInstruction(eulvm.Instruction{
@@ -210,6 +228,8 @@ func (e *eulang) compileExprIntoEasm(easm *easm, expr eulExpr) {
 		}
 	case eulExprKindVarRead:
 		e.compileVarReadIntoEasm(easm, expr.as.varRead)
+	case eulExprKindBinaryOp:
+		e.compileBinaryOpIntoEasm(easm, *expr.as.binaryOp)
 	default:
 		panic("unsupported expression kind")
 	}
