@@ -3,8 +3,8 @@ var i: i64;
 
 func main() {
 	// TODO add support for local variables
-	i = 0;
-	while i<5 {
+	i = 0+2+3;
+	while i<10 {
 		i = i + 1;
 		write("wait a while");
 	}
