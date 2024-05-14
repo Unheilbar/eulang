@@ -9,11 +9,19 @@ import (
 )
 
 type eulGlobalVar struct {
-	addr uint256.Int //offset inside of preallocated memory
-	name string
+	addr  uint256.Int //offset inside of preallocated memory
+	typee eulType
+	loc   eulLoc
+	name  string
 }
 
 type compiledFuncs struct{}
+
+type compiledExpr struct {
+	addr  int     // where it starts
+	typee eulType // the type that compiled expression returns
+	loc   eulLoc
+}
 
 // eulang stores all the context of euler compiler (compiled functions, scopes, etc.)
 type eulang struct {
@@ -44,23 +52,39 @@ func (e *eulang) compileModuleIntoEasm(easm *easm, module eulModule) {
 
 // TODO we don't check uniquness of global variables yet
 func (e *eulang) compileVarDefIntoEasm(easm *easm, vd eulVarDef) {
+	if vd.etype == eulTypeVoid {
+		log.Fatalf("%s:%d:%d ERROR define variable with type void is not allowed (maybe in the future) ",
+			vd.loc.filepath, vd.loc.row, vd.loc.col)
+	}
+
 	var gv eulGlobalVar
+	if _, ok := e.gvars[vd.name]; ok {
+		log.Fatalf("%s:%d:%d ERROR variable '%s' was already defined",
+			vd.loc.filepath, vd.loc.row, vd.loc.col, vd.name)
+	}
+
 	gv.addr = easm.pushByteArrToMemory([]byte{0})
 	gv.name = vd.name
+	gv.typee = vd.etype
+	gv.loc = vd.loc
 
 	e.gvars[gv.name] = gv
 }
 
 func (e *eulang) compileFuncDefIntoEasm(easm *easm, fd eulFuncDef) {
-	for _, statement := range fd.body.statements {
-		e.compileStatementIntoEasm(easm, statement)
-	}
+	e.compileBlockIntoEasm(easm, &fd.body)
 }
 
 func (e *eulang) compileStatementIntoEasm(easm *easm, stmt eulStatement) {
 	switch stmt.kind {
 	case eulStmtKindExpr:
-		e.compileExprIntoEasm(easm, stmt.as.expr)
+		expr := e.compileExprIntoEasm(easm, stmt.as.expr)
+		if expr.typee != eulTypeVoid {
+			// WE need to drop any result of statement as expression from stack because function must have it's return address on the stack
+			easm.pushInstruction(eulvm.Instruction{
+				OpCode: eulvm.DROP,
+			})
+		}
 	case eulStmtKindIf:
 		e.compileIfIntoEasm(easm, stmt.as.eif)
 	case eulStmtKindVarAssign:
@@ -73,8 +97,14 @@ func (e *eulang) compileStatementIntoEasm(easm *easm, stmt eulStatement) {
 }
 
 func (e *eulang) compileWhileIntoEasm(easm *easm, w eulWhile) {
-	condAddr := easm.program.Size()
-	e.compileExprIntoEasm(easm, w.condition)
+	condExpr := e.compileExprIntoEasm(easm, w.condition)
+	//TODO later make something like (checkCondExpression cause it seems like reusable)
+	//TODO for now we don't have booleans
+	if condExpr.typee != eulTypei64 {
+		log.Fatalf("%s:%d:%d ERROR condition expression type should be boolean, got %s",
+			condExpr.loc.filepath, condExpr.loc.row, condExpr.loc.col, eulTypes[condExpr.typee])
+	}
+
 	easm.PushInstruction(eulvm.Instruction{
 		OpCode: eulvm.NOT,
 	})
@@ -86,7 +116,7 @@ func (e *eulang) compileWhileIntoEasm(easm *easm, w eulWhile) {
 	e.compileBlockIntoEasm(easm, &w.body)
 	easm.PushInstruction(eulvm.Instruction{
 		OpCode:  eulvm.JUMPDEST,
-		Operand: *uint256.NewInt(uint64(condAddr)),
+		Operand: *uint256.NewInt(uint64(condExpr.addr)),
 	})
 	bodyEnd := easm.program.Size()
 
@@ -112,31 +142,56 @@ func (e *eulang) compileVarAssignIntoEasm(easm *easm, expr eulVarAssign) {
 	})
 }
 
-func (e *eulang) compileBinaryOpIntoEasm(easm *easm, binOp binaryOp) {
+func (e *eulang) compileBinaryOpIntoEasm(easm *easm, binOp binaryOp) eulType {
+	//TODO in the future probably better to return compiled expression
+	var returnType eulType
+	rhsCompiled := e.compileExprIntoEasm(easm, binOp.rhs)
+	lhsCompiled := e.compileExprIntoEasm(easm, binOp.lhs)
+	{
+		if rhsCompiled.typee != lhsCompiled.typee {
+			log.Fatalf("%s:%d:%d ERROR expression types on left and right side do not match '%s' != '%s'",
+				binOp.loc.filepath, binOp.loc.row, binOp.loc.col, eulTypes[lhsCompiled.typee], eulTypes[rhsCompiled.typee])
+		}
+		if lhsCompiled.typee != eulTypei64 {
+			log.Fatalf("%s:%d:%d ERROR invalid type for compare binary operation '%s'",
+				binOp.loc.filepath, binOp.loc.row, binOp.loc.col, eulTypes[lhsCompiled.typee])
+		}
+	}
+
 	switch binOp.kind {
 	case binaryOpLess:
-		e.compileExprIntoEasm(easm, binOp.rhs)
-		e.compileExprIntoEasm(easm, binOp.lhs)
+		//Typecheck TODO will become a separate function after refacting
 		easm.pushInstruction(eulvm.Instruction{
 			OpCode: eulvm.LT,
 		})
+
+		//TODO booleans have no their own type (maybe they don't need one?)
+		returnType = rhsCompiled.typee
 	case binaryOpPlus:
-		e.compileExprIntoEasm(easm, binOp.lhs)
-		e.compileExprIntoEasm(easm, binOp.rhs)
 		easm.pushInstruction(eulvm.Instruction{
 			OpCode: eulvm.ADD,
 		})
+
+		//TODO for now it's the only supported type
+		returnType = rhsCompiled.typee
 	default:
 		panic("compiling bin op unreachable")
 	}
+
+	return returnType
 }
 
-func (e *eulang) compileVarReadIntoEasm(easm *easm, expr varRead) {
+func (e *eulang) compileVarReadIntoEasm(easm *easm, expr varRead) compiledExpr {
+	var result compiledExpr
+	result.addr = easm.program.Size()
+
 	glVar, ok := e.gvars[expr.name]
 	if !ok {
 		log.Fatalf("%s:%d:%d ERROR cannot read not declared variable '%s'",
 			expr.loc.filepath, expr.loc.row, expr.loc.col, expr.name)
 	}
+	result.typee = glVar.typee
+	result.loc = glVar.loc
 
 	easm.pushInstruction(eulvm.Instruction{
 		OpCode:  eulvm.PUSH,
@@ -145,11 +200,16 @@ func (e *eulang) compileVarReadIntoEasm(easm *easm, expr varRead) {
 	easm.pushInstruction(eulvm.Instruction{
 		OpCode: eulvm.MLOAD,
 	})
+
+	return result
 }
 
 func (e *eulang) compileIfIntoEasm(easm *easm, eif eulIf) {
-
-	e.compileExprIntoEasm(easm, eif.condition)
+	condExpr := e.compileExprIntoEasm(easm, eif.condition)
+	if condExpr.typee != eulTypei64 {
+		log.Fatalf("%s:%d:%d ERROR condition expression type should be boolean, got %s",
+			condExpr.loc.filepath, condExpr.loc.row, condExpr.loc.col, eulTypes[condExpr.typee])
+	}
 
 	easm.pushInstruction(eulvm.Instruction{
 		OpCode: eulvm.NOT,
@@ -184,7 +244,10 @@ func (e *eulang) compileBlockIntoEasm(easm *easm, block *eulBlock) int {
 	return easm.program.Size()
 }
 
-func (e *eulang) compileExprIntoEasm(easm *easm, expr eulExpr) {
+func (e *eulang) compileExprIntoEasm(easm *easm, expr eulExpr) compiledExpr {
+	var cExp compiledExpr
+	cExp.addr = easm.program.Size()
+	cExp.loc = expr.loc
 	switch expr.kind {
 	case eulExprKindFuncCall:
 		// TODO temporary solution hard code just one function
@@ -194,6 +257,7 @@ func (e *eulang) compileExprIntoEasm(easm *easm, expr eulExpr) {
 				OpCode:  eulvm.OpCode(eulvm.NATIVE),
 				Operand: *uint256.NewInt(eulvm.NativeWrite),
 			})
+			cExp.typee = eulTypeVoid
 		} else {
 			panic("unexpected name")
 		}
@@ -210,11 +274,15 @@ func (e *eulang) compileExprIntoEasm(easm *easm, expr eulExpr) {
 			Operand: *uint256.NewInt(uint64(len(expr.as.strLit))),
 		}
 		easm.pushInstruction(pushStrSizeInst)
+
+		//TODO strings dont have their own type. But for now they're just i64 pointers to memory
+		cExp.typee = eulTypei64
 	case eulExprKindIntLit:
 		easm.pushInstruction(eulvm.Instruction{
 			OpCode:  eulvm.PUSH,
 			Operand: *uint256.NewInt(uint64(expr.as.intLit)),
 		})
+		cExp.typee = eulTypei64
 	case eulExprKindBoolLit:
 		if expr.as.boolean {
 			easm.pushInstruction(eulvm.Instruction{
@@ -226,11 +294,16 @@ func (e *eulang) compileExprIntoEasm(easm *easm, expr eulExpr) {
 				OpCode: eulvm.PUSH,
 			})
 		}
+
+		//TODO booleans have no their own type just yet, but they are saved as i64 words on stack
+		cExp.typee = eulTypei64
 	case eulExprKindVarRead:
-		e.compileVarReadIntoEasm(easm, expr.as.varRead)
+		cExp = e.compileVarReadIntoEasm(easm, expr.as.varRead)
 	case eulExprKindBinaryOp:
-		e.compileBinaryOpIntoEasm(easm, *expr.as.binaryOp)
+		cExp.typee = e.compileBinaryOpIntoEasm(easm, *expr.as.binaryOp)
 	default:
 		panic("unsupported expression kind")
 	}
+
+	return cExp
 }

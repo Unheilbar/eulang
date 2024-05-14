@@ -100,7 +100,16 @@ type eulType uint8
 
 const (
 	eulTypei64 eulType = iota
+	eulTypeVoid
+	// to be continued
+	//...
+	eulTypeCount
 )
+
+var eulTypes = map[eulType]string{
+	eulTypei64:  "i64",
+	eulTypeVoid: "void",
+}
 
 type eulVarDef struct {
 	name  string
@@ -238,9 +247,8 @@ func parseEulIf(lex *lexer) eulIf {
 		t := lex.expectKeyword("if")
 		eif.loc = t.loc
 
-		lex.expectToken(eulTokenKindOpenParen)
 		eif.condition = parseEulExpr(lex)
-		lex.expectToken(eulTokenKindCloseParen)
+
 		eif.ethen = parseCurlyEulBlock(lex)
 	}
 
@@ -442,10 +450,17 @@ func parseFuncCallArgs(lex *lexer) []eulFuncCallArg {
 }
 
 func parseEulType(lex *lexer) eulType {
-	//TODO Euler implement other types here later
-	lex.expectKeyword("i64")
+	tok := lex.expectToken(eulTokenKindName)
+	for typee, view := range eulTypes {
+		if tok.view == view {
+			return typee
+		}
+	}
 
-	return eulTypei64
+	log.Fatalf("%s:%d:%d undefined type '%s'",
+		tok.loc.filepath, tok.loc.row, tok.loc.col, tok.view)
+
+	return 99
 }
 
 func parseStrLit(lex *lexer) string {

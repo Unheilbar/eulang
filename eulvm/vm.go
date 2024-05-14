@@ -171,6 +171,10 @@ func executeNext(e *EulVM) error {
 		}
 		e.ip++
 		return nil
+	case DROP:
+		e.stackSize--
+		e.ip++
+		return nil
 	case STOP:
 		return stopToken
 	}

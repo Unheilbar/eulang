@@ -16,6 +16,7 @@ const (
 	MSTORE256
 	MLOAD
 	MLOAD256
+	DROP
 )
 
 // 0x10 range - comparison ops.
@@ -53,6 +54,7 @@ var OpCodesView = map[string]OpCode{
 	"NATIVE":    NATIVE,
 	"NOT":       NOT,
 	"LT":        LT,
+	"DROP":      DROP,
 }
 
 var OpCodes = map[OpCode]string{
@@ -73,4 +75,5 @@ var OpCodes = map[OpCode]string{
 	NATIVE:    "NATIVE",
 	NOT:       "NOT",
 	LT:        "LT",
+	DROP:      "DROP",
 }
