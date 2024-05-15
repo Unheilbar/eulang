@@ -1,7 +1,18 @@
-func foo() {
-	write("foo");
+func foo(a: i64, b:i64) {
+//	a+b;
+	write("foo\n");
 }
 
-func entry(){
-	foo();
+func boo() {
+	write("boo\n");
+}
+
+func cool(i: i64) {
+	write("cool\n");
+}
+
+func entry(i: i64, b: i64) {
+	foo(10,20,"123");
+	boo();
+	cool(20);
 }

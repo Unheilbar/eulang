@@ -232,13 +232,13 @@ func parseFuncDef(lex *lexer) eulFuncDef {
 	f.loc = t.loc
 	f.name = t.view
 
-	f.params = parseFuncParams(lex)
+	f.params = parseFuncDefParams(lex)
 	//TODO eulang func def do not support args yet
 	f.body = *parseCurlyEulBlock(lex)
 	return f
 }
 
-func parseFuncParams(lex *lexer) []eulFuncParam {
+func parseFuncDefParams(lex *lexer) []eulFuncParam {
 	var result []eulFuncParam
 
 	lex.expectToken(eulTokenKindOpenParen)
@@ -478,13 +478,15 @@ func parseFuncCallArgs(lex *lexer) []eulFuncCallArg {
 	lex.expectToken(eulTokenKindOpenParen)
 	// TODO parse fun Call currently supports only 1 argument fix later
 	var t token
-	if lex.peek(&t, 0) && t.kind == eulTokenKindCloseParen {
-		lex.next(&t)
-		return nil
+	for lex.peek(&t, 0) && t.kind != eulTokenKindCloseParen {
+		res = append(res, eulFuncCallArg{
+			value: parseEulExpr(lex),
+		})
+		if lex.peek(&t, 0) && t.kind != eulTokenKindCloseParen {
+			lex.expectToken(eulTokenKindComma)
+		}
 	}
 
-	arg := parseEulExpr(lex)
-	res = append(res, eulFuncCallArg{arg})
 	lex.expectToken(eulTokenKindCloseParen)
 
 	return res
