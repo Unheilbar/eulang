@@ -15,7 +15,13 @@ type eulGlobalVar struct {
 	name  string
 }
 
-type compiledFuncs struct{}
+type compiledFunc struct {
+	loc  eulLoc
+	addr int
+	name string
+
+	//TODO later extend with arguments and return type info
+}
 
 type compiledExpr struct {
 	addr  int     // where it starts
@@ -25,7 +31,7 @@ type compiledExpr struct {
 
 // eulang stores all the context of euler compiler (compiled functions, scopes, etc.)
 type eulang struct {
-	funcs []compiledFuncs
+	funcs map[string]compiledFunc
 
 	// TODO maybe better make a map [name]>globalVar
 	gvars map[string]eulGlobalVar
@@ -34,6 +40,7 @@ type eulang struct {
 func NewEulang() *eulang {
 	return &eulang{
 		gvars: make(map[string]eulGlobalVar),
+		funcs: make(map[string]compiledFunc),
 	}
 }
 
@@ -72,7 +79,15 @@ func (e *eulang) compileVarDefIntoEasm(easm *easm, vd eulVarDef) {
 }
 
 func (e *eulang) compileFuncDefIntoEasm(easm *easm, fd eulFuncDef) {
+	var f compiledFunc
+	f.addr = easm.program.Size()
+	f.name = fd.name
+	f.loc = fd.loc
+	e.funcs[f.name] = f
 	e.compileBlockIntoEasm(easm, &fd.body)
+	easm.pushInstruction(eulvm.Instruction{
+		OpCode: eulvm.RET},
+	)
 }
 
 func (e *eulang) compileStatementIntoEasm(easm *easm, stmt eulStatement) {

@@ -19,7 +19,7 @@ type EulVM struct {
 	memory *Memory
 }
 
-const ProgramLimit = 1024
+const ExecutionLimit = 1024
 
 func New(prog Program) *EulVM {
 	var m *Memory
@@ -34,8 +34,10 @@ func New(prog Program) *EulVM {
 	}
 }
 
-func (e *EulVM) Run() error {
-	for i := 0; i < ProgramLimit; i++ {
+func (e *EulVM) Run(input []Instruction) error {
+	e.setEntry(input) //executes sets entrypoint
+
+	for i := 0; i < ExecutionLimit; i++ {
 		err := executeNext(e)
 		if err != nil {
 			if err == stopToken {
@@ -175,12 +177,38 @@ func executeNext(e *EulVM) error {
 		e.stackSize--
 		e.ip++
 		return nil
+	case CALL:
+		e.stackSize++
+		e.stack[e.stackSize] = *uint256.NewInt(uint64(e.ip + 1)) //set return address of the call
+		e.ip = int(inst.Operand.Uint64())                        //ip jumps to function
+	case RET:
+
 	case STOP:
 		return stopToken
 	}
 
 	return errInvalidOpCodeCalled
 
+}
+
+// set entry point puts arguments on the stack and executes a call of entry function
+// it has limited amount of available opCodes so we don't have to care
+func (e *EulVM) setEntry(input []Instruction) error {
+	for _, inst := range input {
+		switch inst.OpCode {
+		case PUSH:
+			e.stackSize++
+			e.stack[e.stackSize] = inst.Operand
+		case CALL:
+			e.stackSize++
+			e.stack[e.stackSize] = *uint256.NewInt(uint64(e.ip + 1)) //set return address of the call
+			e.ip = int(inst.Operand.Uint64())                        //ip jumps to function
+		case STOP:
+			return stopToken
+		}
+	}
+
+	return nil
 }
 
 func (e *EulVM) Reset() {

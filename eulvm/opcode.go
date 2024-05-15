@@ -17,11 +17,13 @@ const (
 	MLOAD
 	MLOAD256
 	DROP
+	RET
+	CALL
 )
 
 // 0x10 range - comparison ops.
 const (
-	LT OpCode = iota + 0x10
+	LT OpCode = iota + 0x20
 	GT
 	EQ
 	NOT
@@ -29,7 +31,7 @@ const (
 
 // 0x20 - debug
 const (
-	PRINT OpCode = iota + 0x20
+	PRINT OpCode = iota + 0x30
 	INPUT
 	WRITESTR
 	NATIVE
@@ -55,6 +57,7 @@ var OpCodesView = map[string]OpCode{
 	"NOT":       NOT,
 	"LT":        LT,
 	"DROP":      DROP,
+	"RET":       RET,
 }
 
 var OpCodes = map[OpCode]string{
@@ -76,4 +79,5 @@ var OpCodes = map[OpCode]string{
 	NOT:       "NOT",
 	LT:        "LT",
 	DROP:      "DROP",
+	CALL:      "CALL",
 }

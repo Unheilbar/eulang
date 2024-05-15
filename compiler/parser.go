@@ -94,6 +94,7 @@ type eulBlock struct {
 type eulFuncDef struct {
 	name string
 	body eulBlock
+	loc  eulLoc
 }
 
 type eulType uint8
@@ -217,7 +218,10 @@ func parseFuncDef(lex *lexer) eulFuncDef {
 	//var module can be used in the future
 	var f eulFuncDef
 	lex.expectKeyword("func")
-	f.name = lex.expectToken(eulTokenKindName).view
+	t := lex.expectToken(eulTokenKindName)
+	f.loc = t.loc
+	f.name = t.view
+
 	lex.expectToken(eulTokenKindOpenParen)
 	//TODO eulang func def do not support args yet
 	lex.expectToken(eulTokenKindCloseParen)
