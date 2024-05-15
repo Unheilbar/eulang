@@ -1,7 +1,7 @@
 // TODO add support for other types later
 var i: i64;
 
-func main() {
+func mainmain() {
 	// TODO add support for local variables
 	1+2+3;
 	while i<10{

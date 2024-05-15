@@ -19,7 +19,7 @@ func main() {
 
 	//}
 	e := eulvm.New(prog)
-	input := eulang.GenerateInput("main")
+	input := eulang.GenerateInput("mainmain")
 	err := e.Run(input)
 	if err != nil {
 		log.Fatal(err)
