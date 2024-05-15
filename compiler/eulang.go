@@ -80,6 +80,11 @@ func (e *eulang) compileVarDefIntoEasm(easm *easm, vd eulVarDef) {
 
 func (e *eulang) compileFuncDefIntoEasm(easm *easm, fd eulFuncDef) {
 	var f compiledFunc
+	if _, ok := e.funcs[fd.name]; ok {
+		log.Fatalf("%s:%d:%d ERROR double declaration. func '%s' was already defined",
+			fd.loc.filepath, fd.loc.row, fd.loc.col, fd.name)
+	}
+
 	f.addr = easm.program.Size()
 	f.name = fd.name
 	f.loc = fd.loc
@@ -274,7 +279,16 @@ func (e *eulang) compileExprIntoEasm(easm *easm, expr eulExpr) compiledExpr {
 			})
 			cExp.typee = eulTypeVoid
 		} else {
-			panic("unexpected name")
+			//TODO add deffered compiled function addresses resolving later
+			compiledFunc, ok := e.funcs[expr.as.funcCall.name]
+			if !ok {
+				panic(fmt.Sprintf("undefined compiled function %s", expr.as.funcCall.name))
+			}
+			easm.pushInstruction(eulvm.Instruction{
+				OpCode:  eulvm.CALL,
+				Operand: *uint256.NewInt(uint64(compiledFunc.addr)),
+			})
+			cExp.typee = eulTypeVoid
 		}
 	case eulExprKindStrLit:
 		var addr eulvm.Word = easm.pushStringToMemory(expr.as.strLit)

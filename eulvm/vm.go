@@ -236,7 +236,7 @@ func (e *EulVM) execNative(id uint64) error {
 		size := e.stack[e.stackSize]
 		addr := e.stack[e.stackSize-1]
 		e.stackSize -= 2
-		fmt.Println(string(e.memory.store[addr.Uint64() : addr.Uint64()+size.Uint64()]))
+		fmt.Print(string(e.memory.store[addr.Uint64() : addr.Uint64()+size.Uint64()]))
 		return nil
 	}
 

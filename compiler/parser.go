@@ -447,9 +447,16 @@ func parseFuncCallArgs(lex *lexer) []eulFuncCallArg {
 
 	lex.expectToken(eulTokenKindOpenParen)
 	// TODO parse fun Call currently supports only 1 argument fix later
+	var t token
+	if lex.peek(&t, 0) && t.kind == eulTokenKindCloseParen {
+		lex.next(&t)
+		return nil
+	}
+
 	arg := parseEulExpr(lex)
 	res = append(res, eulFuncCallArg{arg})
 	lex.expectToken(eulTokenKindCloseParen)
+
 	return res
 }
 

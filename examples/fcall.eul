@@ -1,0 +1,7 @@
+func foo() {
+	write("foo");
+}
+
+func entry(){
+	foo();
+}

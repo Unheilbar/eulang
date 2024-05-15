@@ -283,7 +283,10 @@ func (lex *lexer) chopToken(kind uint8, size int) token {
 		col:      lex.lineStart,
 		filepath: lex.filepath,
 	}
-
+	if t.kind == eulTokenKindLitStr {
+		//TODO eulang dirty hack
+		t.view = strings.ReplaceAll(t.view, "\\n", "\n")
+	}
 	lex.current = lex.current[size:]
 	lex.lineStart += size
 

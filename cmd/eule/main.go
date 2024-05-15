@@ -18,8 +18,10 @@ func main() {
 	//	fmt.Println(idx, eulvm.OpCodes[inst.OpCode], inst.Operand.Uint64())
 
 	//}
+
 	e := eulvm.New(prog)
-	input := eulang.GenerateInput("mainmain")
+	input := eulang.GenerateInput(os.Args[2])
+
 	err := e.Run(input)
 	if err != nil {
 		log.Fatal(err)
