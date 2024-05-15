@@ -92,9 +92,10 @@ type eulBlock struct {
 }
 
 type eulFuncDef struct {
-	name string
-	body eulBlock
-	loc  eulLoc
+	name   string
+	body   eulBlock
+	loc    eulLoc
+	params []eulFuncParam
 }
 
 type eulType uint8
@@ -104,6 +105,10 @@ const (
 	eulTypeVoid
 	// to be continued
 	//...
+	// NOTE need to think type system
+	// DO we need strings?
+	// DO we need bool/uint256?
+	// DO we need bytes32?
 	eulTypeCount
 )
 
@@ -127,6 +132,12 @@ type eulVarAssign struct {
 type varRead struct {
 	name string
 	loc  eulLoc
+}
+
+type eulFuncParam struct {
+	name  string
+	typee eulType
+	loc   eulLoc
 }
 
 type eulBinaryOpKind uint8
@@ -207,7 +218,6 @@ func parseVarDef(lex *lexer) eulVarDef {
 	t := lex.expectToken(eulTokenKindName)
 	vdef.loc = t.loc
 	vdef.name = t.view
-	lex.expectToken(eulTokenKindColon)
 	vdef.etype = parseEulType(lex)
 	lex.expectToken(eulTokenKindSemicolon)
 
@@ -222,11 +232,31 @@ func parseFuncDef(lex *lexer) eulFuncDef {
 	f.loc = t.loc
 	f.name = t.view
 
-	lex.expectToken(eulTokenKindOpenParen)
+	f.params = parseFuncParams(lex)
 	//TODO eulang func def do not support args yet
-	lex.expectToken(eulTokenKindCloseParen)
 	f.body = *parseCurlyEulBlock(lex)
 	return f
+}
+
+func parseFuncParams(lex *lexer) []eulFuncParam {
+	var result []eulFuncParam
+
+	lex.expectToken(eulTokenKindOpenParen)
+
+	var t token
+	for lex.peek(&t, 0) && t.kind != eulTokenKindCloseParen {
+		var p eulFuncParam
+		tok := lex.expectToken(eulTokenKindName)
+		p.name = tok.view
+		p.loc = tok.loc
+		p.typee = parseEulType(lex)
+		result = append(result, p)
+		if lex.peek(&t, 0) && t.kind != eulTokenKindCloseParen {
+			lex.expectToken(eulTokenKindComma)
+		}
+	}
+	lex.expectToken(eulTokenKindCloseParen)
+	return result
 }
 
 func parseEulWhile(lex *lexer) eulWhile {
@@ -461,6 +491,8 @@ func parseFuncCallArgs(lex *lexer) []eulFuncCallArg {
 }
 
 func parseEulType(lex *lexer) eulType {
+	lex.expectToken(eulTokenKindColon)
+
 	tok := lex.expectToken(eulTokenKindName)
 	for typee, view := range eulTypes {
 		if tok.view == view {

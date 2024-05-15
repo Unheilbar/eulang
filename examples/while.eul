@@ -1,11 +1,11 @@
 // TODO add support for other types later
 var i: i64;
 
-func foo() {
+func foo(b: i64, d: i64) {
 	write("bar\n");
 }
 
-func entry() {
+func entry(q: i64) {
 	// TODO add support for local variables
 	while i<10{
 		i=i+5;
