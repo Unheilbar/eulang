@@ -9,14 +9,17 @@ import (
 
 const stackCapacity = 1024
 
+// input can be accessed by Operations to set program entry point
 type EulVM struct {
 	program []Instruction //TODO make unsafe pointer to avoid program size check?
-	ip      int
+
+	input []byte
+
+	ip int
 
 	stack     [stackCapacity]Word
 	stackSize int
-
-	memory *Memory
+	memory    *Memory
 }
 
 const ExecutionLimit = 1024
@@ -34,8 +37,8 @@ func New(prog Program) *EulVM {
 	}
 }
 
-func (e *EulVM) Run(input []Instruction) error {
-	e.setEntry(input) //executes sets entrypoint
+func (e *EulVM) Run(input []byte) error {
+	e.input = input
 
 	for i := 0; i < ExecutionLimit; i++ {
 		err := executeNext(e)
@@ -181,8 +184,20 @@ func executeNext(e *EulVM) error {
 		e.stackSize++
 		e.stack[e.stackSize] = *uint256.NewInt(uint64(e.ip + 1)) //set return address of the call
 		e.ip = int(inst.Operand.Uint64())                        //ip jumps to function
+		return nil
 	case RET:
+		e.ip = int(e.stack[e.stackSize].Uint64())
+		e.stackSize--
+		return nil
+	case CALLDATA:
+		//TODO later implement load of call parameters
+		var addr uint256.Int
+		addr.SetBytes(e.input[:32])
+		e.stackSize++
+		e.stack[e.stackSize] = *uint256.NewInt(uint64(e.ip + 1)) // ip of return statement is next instruction
 
+		e.ip = int(addr.Uint64()) // set instruction pointer to entry function
+		return nil
 	case STOP:
 		return stopToken
 	}
@@ -191,24 +206,9 @@ func executeNext(e *EulVM) error {
 
 }
 
-// set entry point puts arguments on the stack and executes a call of entry function
-// it has limited amount of available opCodes so we don't have to care
-func (e *EulVM) setEntry(input []Instruction) error {
-	for _, inst := range input {
-		switch inst.OpCode {
-		case PUSH:
-			e.stackSize++
-			e.stack[e.stackSize] = inst.Operand
-		case CALL:
-			e.stackSize++
-			e.stack[e.stackSize] = *uint256.NewInt(uint64(e.ip + 1)) //set return address of the call
-			e.ip = int(inst.Operand.Uint64())                        //ip jumps to function
-		case STOP:
-			return stopToken
-		}
-	}
+// dataload places call arguments on the stack and executes call entry function
+func (e *EulVM) Dataload(input []Instruction) {
 
-	return nil
 }
 
 func (e *EulVM) Reset() {

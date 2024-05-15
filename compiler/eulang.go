@@ -322,3 +322,9 @@ func (e *eulang) compileExprIntoEasm(easm *easm, expr eulExpr) compiledExpr {
 
 	return cExp
 }
+
+// // TODO euler later can add here function arguments
+func (e *eulang) GenerateInput(method string) []byte {
+	k := uint256.NewInt(uint64(e.funcs[method].addr)).Bytes32()
+	return k[:]
+}

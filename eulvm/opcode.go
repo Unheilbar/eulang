@@ -19,6 +19,7 @@ const (
 	DROP
 	RET
 	CALL
+	CALLDATA
 )
 
 // 0x10 range - comparison ops.
@@ -58,6 +59,7 @@ var OpCodesView = map[string]OpCode{
 	"LT":        LT,
 	"DROP":      DROP,
 	"RET":       RET,
+	"CALLDATA":  CALLDATA,
 }
 
 var OpCodes = map[OpCode]string{
@@ -80,4 +82,6 @@ var OpCodes = map[OpCode]string{
 	LT:        "LT",
 	DROP:      "DROP",
 	CALL:      "CALL",
+	CALLDATA:  "CALLDATA",
+	RET:       "RET",
 }
