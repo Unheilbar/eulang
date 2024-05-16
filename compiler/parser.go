@@ -107,10 +107,6 @@ const (
 	eulTypeVoid
 	// to be continued
 	//...
-	// NOTE need to think type system
-	// DO we need strings?
-	// DO we need bool/uint256?
-	// DO we need bytes32?
 	eulTypeCount
 )
 

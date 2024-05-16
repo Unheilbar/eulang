@@ -32,19 +32,20 @@ type compiledExpr struct {
 type varStorage uint8
 
 const (
-	stackStorage        = iota // offset from the stack frame
-	staticMemoryStorage        // absolute address of the variable in static memory
-	versionStorage             // address of the variable in merklelized persistent KV
-	simpleStorage              // address of the variable in not merkilized persistent KV
+	storageKindStack      = iota // offset from the stack frame
+	storageKindStatic            // absolute address of the variable in static memory
+	storageKindVersion           // address of the variable in merklelized persistent KV
+	storageKindPersistent        // address of the variable in not merkilized persistent KV
 )
 
 type compiledVar struct {
 	name  string
 	loc   eulLoc
-	typee eulType
+	etype eulType
 
 	// indicates where is the location of the variable
 	storage varStorage
+	addr    uint256.Int // interpretation based on storageKind
 }
 
 type eulScope struct {
@@ -57,15 +58,14 @@ type eulScope struct {
 type eulang struct {
 	funcs map[string]compiledFunc
 
-	// TODO maybe better make a map [name]>globalVar
-	gvars map[string]eulGlobalVar
-
 	scope *eulScope
 }
 
 func NewEulang() *eulang {
 	return &eulang{
-		gvars: make(map[string]eulGlobalVar),
+		scope: &eulScope{
+			compiledVars: make(map[string]compiledVar),
+		},
 		funcs: make(map[string]compiledFunc),
 	}
 }
@@ -76,7 +76,7 @@ func (e *eulang) compileModuleIntoEasm(easm *easm, module eulModule) {
 		case eulTopKindFunc:
 			e.compileFuncDefIntoEasm(easm, top.as.fdef)
 		case eulTopKindVar:
-			e.compileVarDefIntoEasm(easm, top.as.vdef)
+			e.compileVarDefIntoEasm(easm, top.as.vdef, storageKindStatic)
 		default:
 			panic("try to compile unexpected top kind")
 		}
@@ -84,24 +84,39 @@ func (e *eulang) compileModuleIntoEasm(easm *easm, module eulModule) {
 }
 
 // TODO we don't check uniquness of global variables yet
-func (e *eulang) compileVarDefIntoEasm(easm *easm, vd eulVarDef) {
+func (e *eulang) compileVarDefIntoEasm(easm *easm, vd eulVarDef, storage varStorage) {
+	_ = e.compileVarIntoEasm(easm, vd, storage)
+	if vd.hasInit {
+		panic("var initialization after declaration is not implemented yet")
+	}
+
+}
+
+func (e *eulang) compileVarIntoEasm(easm *easm, vd eulVarDef, storage varStorage) compiledVar {
+	var cv compiledVar
+
 	if vd.etype == eulTypeVoid {
 		log.Fatalf("%s:%d:%d ERROR define variable with type void is not allowed (maybe in the future) ",
 			vd.loc.filepath, vd.loc.row, vd.loc.col)
 	}
+	// NOTE Eulang doesn't warn about shadowing?
 
-	var gv eulGlobalVar
-	if _, ok := e.gvars[vd.name]; ok {
-		log.Fatalf("%s:%d:%d ERROR variable '%s' was already defined",
-			vd.loc.filepath, vd.loc.row, vd.loc.col, vd.name)
+	cv.name = vd.name
+	cv.loc = vd.loc
+	cv.etype = vd.etype
+	cv.storage = storage
+
+	switch storage {
+	case storageKindStatic:
+		cv.addr = easm.pushByteArrToMemory([]byte{0})
+	case storageKindStack:
+		panic("storing variables onto stack will be implemented after introducing stack frames")
+	default:
+		panic("other storage kinds are not implemented yet")
 	}
 
-	gv.addr = easm.pushByteArrToMemory([]byte{0})
-	gv.name = vd.name
-	gv.typee = vd.etype
-	gv.loc = vd.loc
-
-	e.gvars[gv.name] = gv
+	e.scope.compiledVars[cv.name] = cv
+	return cv
 }
 
 func (e *eulang) compileFuncDefIntoEasm(easm *easm, fd eulFuncDef) {
@@ -115,7 +130,9 @@ func (e *eulang) compileFuncDefIntoEasm(easm *easm, fd eulFuncDef) {
 	f.name = fd.name
 	f.loc = fd.loc
 	e.funcs[f.name] = f
+	e.pushNewScope()
 	e.compileBlockIntoEasm(easm, &fd.body)
+	e.popScope()
 	easm.pushInstruction(eulvm.Instruction{
 		OpCode: eulvm.RET},
 	)
@@ -138,7 +155,7 @@ func (e *eulang) compileStatementIntoEasm(easm *easm, stmt eulStatement) {
 	case eulStmtKindWhile:
 		e.compileWhileIntoEasm(easm, stmt.as.while)
 	case eulStmtKindVarDef:
-		e.compileVarDefIntoEasm(easm, stmt.as.vardef)
+		e.compileVarDefIntoEasm(easm, stmt.as.vardef, storageKindStatic)
 	default:
 		panic(fmt.Sprintf("stmt kind doesn't exist kind %d", stmt.kind))
 	}
@@ -160,8 +177,9 @@ func (e *eulang) compileWhileIntoEasm(easm *easm, w eulWhile) {
 	jumpWhileAddr := easm.PushInstruction(eulvm.Instruction{
 		OpCode: eulvm.JUMPI,
 	})
-
+	e.pushNewScope()
 	e.compileBlockIntoEasm(easm, &w.body)
+	e.popScope()
 	easm.PushInstruction(eulvm.Instruction{
 		OpCode:  eulvm.JUMPDEST,
 		Operand: *uint256.NewInt(uint64(condExpr.addr)),
@@ -173,11 +191,16 @@ func (e *eulang) compileWhileIntoEasm(easm *easm, w eulWhile) {
 }
 
 func (e *eulang) compileVarAssignIntoEasm(easm *easm, expr eulVarAssign) {
-	vari, ok := e.gvars[expr.name]
+	vari := e.getCompiledVarByName(expr.name)
 
-	if !ok {
+	if vari == nil {
 		log.Fatalf("%s:%d:%d ERROR cannot assign not declared variable '%s'",
 			expr.loc.filepath, expr.loc.row, expr.loc.col, expr.name)
+	}
+
+	//TODO var reads and var write should be depending on type and storage
+	if vari.storage != storageKindStatic {
+		panic("assigning non-static variables is not implemented yet")
 	}
 
 	easm.pushInstruction(eulvm.Instruction{
@@ -233,17 +256,14 @@ func (e *eulang) compileVarReadIntoEasm(easm *easm, expr varRead) compiledExpr {
 	var result compiledExpr
 	result.addr = easm.program.Size()
 
-	glVar, ok := e.gvars[expr.name]
-	if !ok {
-		log.Fatalf("%s:%d:%d ERROR cannot read not declared variable '%s'",
-			expr.loc.filepath, expr.loc.row, expr.loc.col, expr.name)
-	}
-	result.typee = glVar.typee
-	result.loc = glVar.loc
+	cvar := e.getCompiledVarByName(expr.name)
+	result.typee = cvar.etype
+	result.loc = cvar.loc
 
+	//TODO var reads and var write should be depending on type and storage
 	easm.pushInstruction(eulvm.Instruction{
 		OpCode:  eulvm.PUSH,
-		Operand: glVar.addr,
+		Operand: cvar.addr,
 	})
 	easm.pushInstruction(eulvm.Instruction{
 		OpCode: eulvm.MLOAD,
@@ -266,14 +286,16 @@ func (e *eulang) compileIfIntoEasm(easm *easm, eif eulIf) {
 	jmpThenAddr := easm.pushInstruction(eulvm.Instruction{
 		OpCode: eulvm.JUMPI,
 	})
+	e.pushNewScope()
 	e.compileBlockIntoEasm(easm, eif.ethen)
-
+	e.popScope()
 	jmpElseAddr := easm.pushInstruction(eulvm.Instruction{
 		OpCode: eulvm.JUMPDEST,
 	})
 	elseAddr := easm.program.Size()
+	e.pushNewScope()
 	e.compileBlockIntoEasm(easm, eif.elze)
-
+	e.popScope()
 	endAddr := easm.program.Size()
 
 	easm.program.Instrutions[jmpThenAddr].Operand = *uint256.NewInt(uint64(elseAddr))
@@ -374,7 +396,19 @@ func (e *eulang) pushNewScope() {
 }
 
 func (e *eulang) popScope() {
+	//TODO dealloc stack after introducing frames
+
 	e.scope = e.scope.parent
+}
+
+func (e *eulang) getCompiledVarByName(name string) *compiledVar {
+	for scope := e.scope; scope != nil; scope = scope.parent {
+		if cvar, ok := scope.compiledVars[name]; ok {
+			return &cvar
+		}
+	}
+
+	return nil
 }
 
 // // TODO euler later can add here function arguments

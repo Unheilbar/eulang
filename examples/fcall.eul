@@ -1,18 +1,9 @@
-func foo(a: i64, b:i64) {
-//	a+b;
-	write("foo\n");
-}
-
-func boo() {
-	write("boo\n");
-}
-
 func cool(i: i64) {
-	write("cool\n");
+	if i>10 {
+		write("cool\n");
+	}
 }
 
-func entry(i: i64, b: i64) {
-	foo(10,20,"123");
-	boo();
+func entry() {
 	cool(20);
 }
