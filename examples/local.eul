@@ -8,9 +8,10 @@ func test(){
 }
 
 func entry() {
+	var i: i64;
 	i = 20;
 	test();
-	if i < 15{
+	if i < 15 {
 		write("fail\n");
 	} else {
 		write("success\n");

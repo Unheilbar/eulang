@@ -152,7 +152,7 @@ func executeNext(e *EulVM) error {
 			return errInvalidMemoryAccess
 		}
 
-		e.stack[e.stackSize].SetBytes(e.memory.store[addr:32])
+		e.stack[e.stackSize].SetBytes(e.memory.store[addr : addr+32])
 		e.ip++
 		return nil
 	case LT:
