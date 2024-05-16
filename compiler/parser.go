@@ -73,6 +73,7 @@ const (
 	eulStmtKindIf
 	eulStmtKindVarAssign
 	eulStmtKindWhile
+	eulStmtKindVarDef
 )
 
 type eulStatementAs struct {
@@ -80,6 +81,7 @@ type eulStatementAs struct {
 	eif       eulIf
 	varAssign eulVarAssign
 	while     eulWhile
+	vardef    eulVarDef
 }
 
 type eulStatement struct {
@@ -121,6 +123,9 @@ type eulVarDef struct {
 	name  string
 	etype eulType
 	loc   eulLoc
+
+	init    eulExpr
+	hasInit bool
 }
 
 type eulVarAssign struct {
@@ -219,6 +224,17 @@ func parseVarDef(lex *lexer) eulVarDef {
 	vdef.loc = t.loc
 	vdef.name = t.view
 	vdef.etype = parseEulType(lex)
+
+	// Try to parse assignment
+	{
+		var t token
+		if lex.peek(&t, 0) && t.kind == eulTokenKindEq {
+			lex.next(&t)
+			vdef.hasInit = true
+			vdef.init = parseEulExpr(lex)
+		}
+	}
+
 	lex.expectToken(eulTokenKindSemicolon)
 
 	return vdef
@@ -317,6 +333,11 @@ func parseEulStmt(lex *lexer) eulStatement {
 			var stmt eulStatement
 			stmt.kind = eulStmtKindWhile
 			stmt.as.while = parseEulWhile(lex)
+			return stmt
+		case "var":
+			var stmt eulStatement
+			stmt.kind = eulStmtKindVarDef
+			stmt.as.vardef = parseVarDef(lex)
 			return stmt
 		default:
 			var nt token

@@ -1,0 +1,13 @@
+var a: i64;
+
+func foo(a: i64) {
+	write("432\n");
+}
+
+func entry() {
+	var i: i64;
+	var b: i64 = 2;
+	
+	write("123\n");
+	foo(i);
+}

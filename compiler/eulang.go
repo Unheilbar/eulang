@@ -29,12 +29,38 @@ type compiledExpr struct {
 	loc   eulLoc
 }
 
+type varStorage uint8
+
+const (
+	stackStorage        = iota // offset from the stack frame
+	staticMemoryStorage        // absolute address of the variable in static memory
+	versionStorage             // address of the variable in merklelized persistent KV
+	simpleStorage              // address of the variable in not merkilized persistent KV
+)
+
+type compiledVar struct {
+	name  string
+	loc   eulLoc
+	typee eulType
+
+	// indicates where is the location of the variable
+	storage varStorage
+}
+
+type eulScope struct {
+	parent *eulScope
+
+	compiledVars map[string]compiledVar
+}
+
 // eulang stores all the context of euler compiler (compiled functions, scopes, etc.)
 type eulang struct {
 	funcs map[string]compiledFunc
 
 	// TODO maybe better make a map [name]>globalVar
 	gvars map[string]eulGlobalVar
+
+	scope *eulScope
 }
 
 func NewEulang() *eulang {
@@ -111,6 +137,8 @@ func (e *eulang) compileStatementIntoEasm(easm *easm, stmt eulStatement) {
 		e.compileVarAssignIntoEasm(easm, stmt.as.varAssign)
 	case eulStmtKindWhile:
 		e.compileWhileIntoEasm(easm, stmt.as.while)
+	case eulStmtKindVarDef:
+		e.compileVarDefIntoEasm(easm, stmt.as.vardef)
 	default:
 		panic(fmt.Sprintf("stmt kind doesn't exist kind %d", stmt.kind))
 	}
@@ -335,6 +363,18 @@ func (e *eulang) compileExprIntoEasm(easm *easm, expr eulExpr) compiledExpr {
 	}
 
 	return cExp
+}
+
+func (e *eulang) pushNewScope() {
+	scope := eulScope{
+		parent:       e.scope,
+		compiledVars: make(map[string]compiledVar),
+	}
+	e.scope = &scope
+}
+
+func (e *eulang) popScope() {
+	e.scope = e.scope.parent
 }
 
 // // TODO euler later can add here function arguments
