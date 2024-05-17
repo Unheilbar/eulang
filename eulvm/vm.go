@@ -69,7 +69,7 @@ func executeNext(e *EulVM) error {
 
 	inst := e.program[e.ip]
 
-	//fmt.Println(e.ip, "-->call", OpCodes[inst.OpCode], "operand", inst.Operand.Uint64())
+	//fmt.Println(e.ip, "-->call", OpCodes[inst.OpCode], inst.OpCode, "operand", inst.Operand.Uint64())
 	switch inst.OpCode {
 	case PUSH:
 		e.stackSize++
@@ -120,20 +120,6 @@ func executeNext(e *EulVM) error {
 		e.stackSize++
 		e.stack[e.stackSize] = *uint256.NewInt(uint64(i))
 		e.ip++
-		return nil
-	case PRINT:
-		// EULER! for debug only [deprecated use native]
-		num := e.stack[e.stackSize]
-		fmt.Println(num.Uint64())
-		e.ip++
-		return nil
-	case WRITESTR:
-		// EULER! for debug only [deprecated use native]
-		size := e.stack[e.stackSize].Uint64()
-		offset := e.stack[e.stackSize-1].Uint64()
-		fmt.Println(string(e.memory.store[offset:size]))
-		e.ip++
-		e.stackSize -= 2
 		return nil
 	// TODO in a future case MSTORE8:
 	case NATIVE:

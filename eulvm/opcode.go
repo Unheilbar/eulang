@@ -62,6 +62,7 @@ var OpCodesView = map[string]OpCode{
 	"RET":       RET,
 	"CALLDATA":  CALLDATA,
 	"SWAP":      SWAP,
+	"SUB":       SUB,
 }
 
 var OpCodes = map[OpCode]string{
@@ -87,4 +88,7 @@ var OpCodes = map[OpCode]string{
 	CALLDATA:  "CALLDATA",
 	RET:       "RET",
 	SWAP:      "SWAP",
+	SUB:       "SUB",
 }
+
+func checkOpCodes() {}

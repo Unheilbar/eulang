@@ -102,6 +102,13 @@ func (e *eulang) compileVarIntoEasm(easm *easm, vd eulVarDef, storage varStorage
 		log.Fatalf("%s:%d:%d ERROR define variable with type void is not allowed (maybe in the future) ",
 			vd.loc.filepath, vd.loc.row, vd.loc.col)
 	}
+
+	_, ok := e.scope.compiledVars[vd.name]
+	if ok {
+		log.Fatalf("%s:%d:%d ERROR variable '%s' was already delcared at current scope ",
+			vd.loc.filepath, vd.loc.row, vd.loc.col, vd.name)
+	}
+
 	// NOTE Eulang doesn't warn about shadowing?
 
 	cv.name = vd.name
@@ -113,7 +120,7 @@ func (e *eulang) compileVarIntoEasm(easm *easm, vd eulVarDef, storage varStorage
 	case storageKindStatic:
 		cv.addr = easm.pushByteArrToMemory([]byte{0})
 	case storageKindStack:
-		e.frameSize += 32 // all var have the size of 1 machine word
+		e.frameSize += 1 // all var have the size of 1 machine word
 		cv.addr = *uint256.NewInt(e.frameSize)
 	default:
 		panic("other storage kinds are not implemented yet")
@@ -406,7 +413,7 @@ func (e *eulang) popScope() {
 	var deallocs uint64
 	for _, varr := range e.scope.compiledVars {
 		if varr.storage == storageKindStack {
-			deallocs += 32 // TODO for now all var have fixed size of 1 machine word (change later?)
+			deallocs += 1 // TODO for now all var have fixed size of 1 machine word (change later?)
 		}
 	}
 	e.frameSize -= deallocs
