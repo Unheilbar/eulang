@@ -59,6 +59,9 @@ type eulang struct {
 	funcs map[string]compiledFunc
 
 	scope *eulScope
+
+	stackFrameAddr uint256.Int
+	frameSize      uint64
 }
 
 func NewEulang() *eulang {
@@ -110,7 +113,8 @@ func (e *eulang) compileVarIntoEasm(easm *easm, vd eulVarDef, storage varStorage
 	case storageKindStatic:
 		cv.addr = easm.pushByteArrToMemory([]byte{0})
 	case storageKindStack:
-		panic("storing variables onto stack will be implemented after introducing stack frames")
+		e.frameSize += 32 // all var have the size of 1 machine word
+		cv.addr = *uint256.NewInt(e.frameSize)
 	default:
 		panic("other storage kinds are not implemented yet")
 	}
@@ -155,7 +159,7 @@ func (e *eulang) compileStatementIntoEasm(easm *easm, stmt eulStatement) {
 	case eulStmtKindWhile:
 		e.compileWhileIntoEasm(easm, stmt.as.while)
 	case eulStmtKindVarDef:
-		e.compileVarDefIntoEasm(easm, stmt.as.vardef, storageKindStatic)
+		e.compileVarDefIntoEasm(easm, stmt.as.vardef, storageKindStack)
 	default:
 		panic(fmt.Sprintf("stmt kind doesn't exist kind %d", stmt.kind))
 	}
@@ -198,16 +202,14 @@ func (e *eulang) compileVarAssignIntoEasm(easm *easm, expr eulVarAssign) {
 			expr.loc.filepath, expr.loc.row, expr.loc.col, expr.name)
 	}
 
-	//TODO var reads and var write should be depending on type and storage
-	if vari.storage != storageKindStatic {
-		panic("assigning non-static variables is not implemented yet")
+	e.compileGetVarAddr(easm, vari)
+	compiledExpr := e.compileExprIntoEasm(easm, expr.value)
+
+	if compiledExpr.typee != vari.etype {
+		log.Fatalf("%s:%d:%d ERROR do not match types on the left and right side in expression '%s'",
+			expr.loc.filepath, expr.loc.row, expr.loc.col, expr.name)
 	}
 
-	easm.pushInstruction(eulvm.Instruction{
-		OpCode:  eulvm.PUSH,
-		Operand: vari.addr,
-	})
-	e.compileExprIntoEasm(easm, expr.value)
 	easm.pushInstruction(eulvm.Instruction{
 		OpCode: eulvm.MSTORE256,
 	})
@@ -252,24 +254,22 @@ func (e *eulang) compileBinaryOpIntoEasm(easm *easm, binOp binaryOp) eulType {
 	return returnType
 }
 
-func (e *eulang) compileVarReadIntoEasm(easm *easm, expr varRead) compiledExpr {
-	var result compiledExpr
-	result.addr = easm.program.Size()
-
+func (e *eulang) compileVarReadIntoEasm(easm *easm, expr varRead) eulType {
 	cvar := e.getCompiledVarByName(expr.name)
-	result.typee = cvar.etype
-	result.loc = cvar.loc
+
+	if cvar == nil {
+		log.Fatalf("%s:%d:%d ERROR condition expression type should be boolean, got %s",
+			expr.loc.filepath, expr.loc.row, expr.loc.col, expr.name)
+	}
+
+	e.compileGetVarAddr(easm, cvar)
 
 	//TODO var reads and var write should be depending on type and storage
-	easm.pushInstruction(eulvm.Instruction{
-		OpCode:  eulvm.PUSH,
-		Operand: cvar.addr,
-	})
 	easm.pushInstruction(eulvm.Instruction{
 		OpCode: eulvm.MLOAD,
 	})
 
-	return result
+	return cvar.etype
 }
 
 func (e *eulang) compileIfIntoEasm(easm *easm, eif eulIf) {
@@ -334,10 +334,12 @@ func (e *eulang) compileExprIntoEasm(easm *easm, expr eulExpr) compiledExpr {
 			if !ok {
 				panic(fmt.Sprintf("undefined compiled function %s", expr.as.funcCall.name))
 			}
+			e.compilePushNewFrame(easm)
 			easm.pushInstruction(eulvm.Instruction{
 				OpCode:  eulvm.CALL,
 				Operand: *uint256.NewInt(uint64(compiledFunc.addr)),
 			})
+			e.compilePopFrame(easm)
 			cExp.typee = eulTypeVoid
 		}
 	case eulExprKindStrLit:
@@ -377,7 +379,7 @@ func (e *eulang) compileExprIntoEasm(easm *easm, expr eulExpr) compiledExpr {
 		//TODO booleans have no their own type just yet, but they are saved as i64 words on stack
 		cExp.typee = eulTypei64
 	case eulExprKindVarRead:
-		cExp = e.compileVarReadIntoEasm(easm, expr.as.varRead)
+		cExp.typee = e.compileVarReadIntoEasm(easm, expr.as.varRead)
 	case eulExprKindBinaryOp:
 		cExp.typee = e.compileBinaryOpIntoEasm(easm, *expr.as.binaryOp)
 	default:
@@ -395,8 +397,19 @@ func (e *eulang) pushNewScope() {
 	e.scope = &scope
 }
 
+// Scope operations
 func (e *eulang) popScope() {
-	//TODO dealloc stack after introducing frames
+	if e.scope == nil {
+		panic("try pop nil scope")
+	}
+
+	var deallocs uint64
+	for _, varr := range e.scope.compiledVars {
+		if varr.storage == storageKindStack {
+			deallocs += 32 // TODO for now all var have fixed size of 1 machine word (change later?)
+		}
+	}
+	e.frameSize -= deallocs
 
 	e.scope = e.scope.parent
 }
@@ -409,6 +422,101 @@ func (e *eulang) getCompiledVarByName(name string) *compiledVar {
 	}
 
 	return nil
+}
+
+// Frame operations
+func (e *eulang) compilePushNewFrame(easm *easm) {
+	// 1. Read frame addr
+	e.compileReadFrameAddr(easm)
+
+	// 2. Offset the frame addr to find the top of the stack
+	easm.pushInstruction(eulvm.Instruction{
+		OpCode:  eulvm.PUSH,
+		Operand: *uint256.NewInt(e.frameSize),
+	})
+	easm.pushInstruction(eulvm.Instruction{
+		OpCode: eulvm.SUB,
+	})
+
+	// 3. store prev stack frame address
+	easm.pushInstruction(eulvm.Instruction{
+		OpCode:  eulvm.PUSH,
+		Operand: *uint256.NewInt(32), // the size of the machine word
+	})
+	easm.pushInstruction(eulvm.Instruction{
+		OpCode: eulvm.SUB,
+	})
+	easm.pushInstruction(eulvm.Instruction{
+		OpCode: eulvm.DUP,
+	})
+	e.compileReadFrameAddr(easm)
+	easm.pushInstruction(eulvm.Instruction{
+		OpCode: eulvm.MSTORE256,
+	})
+
+	// 4. Redirect the current frame
+	e.compileWriteFrameAddr(easm)
+
+}
+
+func (e *eulang) compilePopFrame(easm *easm) {
+	// 1. read frame addr
+	e.compileReadFrameAddr(easm)
+
+	// 2. read prev frame addr
+	easm.pushInstruction(eulvm.Instruction{
+		OpCode: eulvm.MLOAD,
+	})
+
+	// 3. write prev frame addr
+	e.compileWriteFrameAddr(easm)
+}
+
+// Reads current stack frame address from VM memory
+func (e *eulang) compileReadFrameAddr(easm *easm) {
+	easm.pushInstruction(eulvm.Instruction{
+		OpCode:  eulvm.PUSH,
+		Operand: e.stackFrameAddr,
+	})
+	easm.pushInstruction(eulvm.Instruction{
+		OpCode: eulvm.MLOAD,
+	})
+}
+
+// Writes current stack frame address to VM memory
+func (e *eulang) compileWriteFrameAddr(easm *easm) {
+	easm.pushInstruction(eulvm.Instruction{ // [...stack...] -> [...stack...frameAddr]
+		OpCode:  eulvm.PUSH,
+		Operand: e.stackFrameAddr,
+	})
+	easm.pushInstruction(eulvm.Instruction{ // [...stack...frameAddr] -> [...stack...frameAddr...]
+		OpCode:  eulvm.SWAP,
+		Operand: *uint256.NewInt(1),
+	})
+	easm.pushInstruction(eulvm.Instruction{ // [...stack...frameAddr...] -> [...stack...]
+		OpCode: eulvm.MSTORE256,
+	})
+}
+
+func (e *eulang) compileGetVarAddr(easm *easm, cv *compiledVar) {
+	switch cv.storage {
+	case storageKindStatic:
+		easm.pushInstruction(eulvm.Instruction{
+			OpCode:  eulvm.PUSH,
+			Operand: cv.addr,
+		})
+	case storageKindStack:
+		e.compileReadFrameAddr(easm)
+		easm.pushInstruction(eulvm.Instruction{
+			OpCode:  eulvm.PUSH,
+			Operand: cv.addr,
+		})
+		easm.pushInstruction(eulvm.Instruction{
+			OpCode: eulvm.SUB,
+		})
+	default:
+		panic("compiling other storage types is not implemented yet")
+	}
 }
 
 // // TODO euler later can add here function arguments

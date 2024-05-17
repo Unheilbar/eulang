@@ -9,6 +9,7 @@ const (
 	SUB
 	POP
 	PUSH
+	SWAP
 	DUP
 	JUMPDEST
 	JUMPI
@@ -60,6 +61,7 @@ var OpCodesView = map[string]OpCode{
 	"DROP":      DROP,
 	"RET":       RET,
 	"CALLDATA":  CALLDATA,
+	"SWAP":      SWAP,
 }
 
 var OpCodes = map[OpCode]string{
@@ -84,4 +86,5 @@ var OpCodes = map[OpCode]string{
 	CALL:      "CALL",
 	CALLDATA:  "CALLDATA",
 	RET:       "RET",
+	SWAP:      "SWAP",
 }

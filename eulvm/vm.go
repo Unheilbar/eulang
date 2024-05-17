@@ -165,6 +165,13 @@ func executeNext(e *EulVM) error {
 		}
 		e.ip++
 		return nil
+	case SUB:
+		x := e.stack[e.stackSize]
+		y := e.stack[e.stackSize-1]
+		e.stackSize--
+		e.stack[e.stackSize] = *x.Sub(&x, &y)
+		e.ip++
+		return nil
 	case NOP:
 		e.ip++
 		return nil
@@ -197,6 +204,13 @@ func executeNext(e *EulVM) error {
 		e.stack[e.stackSize] = *uint256.NewInt(uint64(e.ip + 1)) // ip of return statement is next instruction
 
 		e.ip = int(addr.Uint64()) // set instruction pointer to entry function
+		return nil
+	case SWAP:
+		//TODO add stack overflow check
+		a := e.stackSize - 1
+		b := e.stackSize - 1 - int(inst.Operand.Uint64())
+		e.stack[a], e.stack[b] = e.stack[b], e.stack[a]
+		e.ip++
 		return nil
 	case STOP:
 		return stopToken

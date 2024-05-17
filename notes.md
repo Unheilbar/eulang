@@ -10,3 +10,9 @@ go/src/cmd/compile/README.md guide into go compiler
  - [ ] Add binary operations add/sub/div/multi/mod
  - [ ] Add comparison operations for strings, bytes32, etc.
  - [ ] Add function visibility identifier (start with all function internal by default, external functions can be called only from outside)
+
+
+#### Frames
+
+###### push new frame:
+ [...stack...] -> 
