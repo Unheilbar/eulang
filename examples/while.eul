@@ -1,4 +1,3 @@
-// TODO add support for other types later
 var i: i64;
 
 func foo() {
@@ -6,10 +5,10 @@ func foo() {
 }
 
 func entry() {
-	// TODO add support for local variables
+	i = 2;
 	while i<10{
 		i=i+5;
-		foo(10, 20);
+		foo();
 	}
 	write("hello this is eulang. golang embedded interpreter programming language! and this string is longer than 32 bytes which kind of important for my test case\n");
 }

@@ -3,11 +3,12 @@ package eulvm
 import (
 	"errors"
 	"fmt"
+	"strings"
 
 	"github.com/holiman/uint256"
 )
 
-const stackCapacity = 1024
+const StackCapacity = 32
 
 // input can be accessed by Operations to set program entry point
 type EulVM struct {
@@ -17,9 +18,11 @@ type EulVM struct {
 
 	ip int
 
-	stack     [stackCapacity]Word
+	stack     [StackCapacity]Word
 	stackSize int
 	memory    *Memory
+
+	debug bool
 }
 
 const ExecutionLimit = 1024
@@ -35,6 +38,11 @@ func New(prog Program) *EulVM {
 		program: prog.Instrutions,
 		memory:  m,
 	}
+}
+
+func (e *EulVM) WithDebug() *EulVM {
+	e.debug = true
+	return e
 }
 
 func (e *EulVM) Run(input []byte) error {
@@ -68,8 +76,32 @@ func executeNext(e *EulVM) error {
 	}
 
 	inst := e.program[e.ip]
-
-	//fmt.Println(e.ip, "-->call", OpCodes[inst.OpCode], inst.OpCode, "operand", inst.Operand.Uint64())
+	if e.debug {
+		var command string
+		fmt.Scanf("%s", &command)
+		command = strings.TrimSpace(command)
+		switch command {
+		case "help":
+			fmt.Println(
+				` debug mode for evm commands:
+			  stack - dump current stack state
+			  memory - dump current memory state
+			  next_op or ''- show next command for execution
+			`)
+			return nil
+		case "stack":
+			e.Dump()
+			return nil
+		case "memory":
+			e.memory.Dump()
+			return nil
+		case "", "next_op":
+		default:
+			fmt.Println("use help to get commands info")
+			return nil
+		}
+		fmt.Println("ip:", e.ip, "-->call:", OpCodes[inst.OpCode], "operand:", inst.Operand.Uint64())
+	}
 	switch inst.OpCode {
 	case PUSH:
 		e.stackSize++
@@ -155,7 +187,9 @@ func executeNext(e *EulVM) error {
 		x := e.stack[e.stackSize]
 		y := e.stack[e.stackSize-1]
 		e.stackSize--
+		fmt.Println("sub", x.Uint64(), y.Uint64())
 		e.stack[e.stackSize] = *x.Sub(&x, &y)
+		fmt.Println("sub res", e.stack[e.stackSize].Uint64())
 		e.ip++
 		return nil
 	case NOP:
@@ -174,13 +208,16 @@ func executeNext(e *EulVM) error {
 		e.ip++
 		return nil
 	case CALL:
-		e.stackSize++
+		e.stackSize += 1
 		e.stack[e.stackSize] = *uint256.NewInt(uint64(e.ip + 1)) //set return address of the call
-		e.ip = int(inst.Operand.Uint64())                        //ip jumps to function
+		fmt.Println("return addr", e.stack[e.stackSize].Uint64(), "stackSize:", e.stackSize)
+		e.ip = int(inst.Operand.Uint64()) //ip jumps to function
 		return nil
 	case RET:
 		e.ip = int(e.stack[e.stackSize].Uint64())
 		e.stackSize--
+		fmt.Println("real return addr", e.stack[e.stackSize+1].Uint64())
+		fmt.Println("return to ", e.ip, "stackSize", e.stackSize)
 		return nil
 	case CALLDATA:
 		//TODO later implement load of call parameters
@@ -206,23 +243,18 @@ func executeNext(e *EulVM) error {
 
 }
 
-// dataload places call arguments on the stack and executes call entry function
-func (e *EulVM) Dataload(input []Instruction) {
-
-}
-
 func (e *EulVM) Reset() {
 	e.ip = 0
 	e.stackSize = 0
 }
 
 func (e *EulVM) Dump() {
+	fmt.Println("stack size:", e.stackSize)
 	fmt.Println("-----stack-----")
 	for i := 0; i <= e.stackSize; i++ {
 		fmt.Println(e.stack[i])
 	}
 	fmt.Println("-----dump-----")
-	e.memory.Dump()
 }
 
 // euler native functions

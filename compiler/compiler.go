@@ -7,6 +7,8 @@ func CompileFromSource(eulang *eulang, filename string) eulvm.Program {
 	module := parseEulModule(lex)
 	easm := NewEasm()
 
+	eulang.prepareVarStack(easm, eulvm.StackCapacity)
+
 	easm.PushInstruction(eulvm.Instruction{
 		OpCode: eulvm.CALLDATA,
 	})
@@ -16,7 +18,9 @@ func CompileFromSource(eulang *eulang, filename string) eulvm.Program {
 		OpCode: eulvm.STOP,
 	})
 
+	eulang.pushNewScope()
 	eulang.compileModuleIntoEasm(easm, module)
+	eulang.popScope()
 
 	return easm.GetProgram()
 }

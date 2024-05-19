@@ -12,19 +12,12 @@ func main() {
 	file := os.Args[1]
 
 	eulang := compiler.NewEulang()
-
 	prog := compiler.CompileFromSource(eulang, file)
-	//for idx, inst := range prog.Instrutions {
-	//	fmt.Println(idx, eulvm.OpCodes[inst.OpCode], inst.Operand.Uint64())
-
-	//}
-
-	e := eulvm.New(prog)
+	e := eulvm.New(prog).WithDebug()
 	input := eulang.GenerateInput(os.Args[2])
 
 	err := e.Run(input)
 	if err != nil {
 		log.Fatal(err)
 	}
-	//e.Dump()
 }

@@ -6,7 +6,7 @@ import (
 	"github.com/holiman/uint256"
 )
 
-const MemoryCapacity = 4 * 1024 // memory limit to avoid extra allocations during execution
+const MemoryCapacity = 100 * 1024 // memory limit to avoid extra allocations during execution
 
 type Memory struct {
 	store [MemoryCapacity]byte //
@@ -48,6 +48,7 @@ func (m *Memory) Store() []byte {
 }
 
 func (m *Memory) Dump() {
+	fmt.Println("allocated size:", m.size)
 	fmt.Println("===memory dump===")
 	fmt.Println(m.store[:m.size])
 	fmt.Println("=end memory dump=")

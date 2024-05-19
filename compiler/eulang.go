@@ -16,10 +16,10 @@ type eulGlobalVar struct {
 }
 
 type compiledFunc struct {
-	loc  eulLoc
-	addr int
-	name string
-
+	loc    eulLoc
+	addr   int
+	name   string
+	params []eulFuncParam
 	//TODO later extend with arguments and return type info
 }
 
@@ -120,8 +120,9 @@ func (e *eulang) compileVarIntoEasm(easm *easm, vd eulVarDef, storage varStorage
 	case storageKindStatic:
 		cv.addr = easm.pushByteArrToMemory([]byte{0})
 	case storageKindStack:
-		e.frameSize += 1 // all var have the size of 1 machine word
+		e.frameSize += 32 // all var have the size of 1 machine word
 		cv.addr = *uint256.NewInt(e.frameSize)
+		fmt.Println("frame size", e.frameSize)
 	default:
 		panic("other storage kinds are not implemented yet")
 	}
@@ -140,8 +141,34 @@ func (e *eulang) compileFuncDefIntoEasm(easm *easm, fd eulFuncDef) {
 	f.addr = easm.program.Size()
 	f.name = fd.name
 	f.loc = fd.loc
+	f.params = fd.params
 	e.funcs[f.name] = f
 	e.pushNewScope()
+
+	// compile func params
+	{
+		for _, param := range fd.params {
+			var vd eulVarDef
+			vd.name = param.name
+			vd.loc = param.loc
+			vd.etype = param.typee
+
+			varr := e.compileVarIntoEasm(easm, vd, storageKindStack)
+			easm.pushInstruction(eulvm.Instruction{
+				OpCode:  eulvm.SWAP,
+				Operand: *uint256.NewInt(1),
+			})
+			e.compileGetVarAddr(easm, &varr)
+			easm.pushInstruction(eulvm.Instruction{
+				OpCode:  eulvm.SWAP,
+				Operand: *uint256.NewInt(1),
+			})
+			easm.PushInstruction(eulvm.Instruction{
+				OpCode: eulvm.MSTORE256,
+			})
+		}
+	}
+
 	e.compileBlockIntoEasm(easm, &fd.body)
 	e.popScope()
 	easm.pushInstruction(eulvm.Instruction{
@@ -166,6 +193,7 @@ func (e *eulang) compileStatementIntoEasm(easm *easm, stmt eulStatement) {
 	case eulStmtKindWhile:
 		e.compileWhileIntoEasm(easm, stmt.as.while)
 	case eulStmtKindVarDef:
+		// TODO statements as vars should be compiling into stack storage for compile-time known variables
 		e.compileVarDefIntoEasm(easm, stmt.as.vardef, storageKindStack)
 	default:
 		panic(fmt.Sprintf("stmt kind doesn't exist kind %d", stmt.kind))
@@ -336,17 +364,7 @@ func (e *eulang) compileExprIntoEasm(easm *easm, expr eulExpr) compiledExpr {
 			})
 			cExp.typee = eulTypeVoid
 		} else {
-			//TODO add deffered compiled function addresses resolving later
-			compiledFunc, ok := e.funcs[expr.as.funcCall.name]
-			if !ok {
-				panic(fmt.Sprintf("undefined compiled function %s", expr.as.funcCall.name))
-			}
-			e.compilePushNewFrame(easm)
-			easm.pushInstruction(eulvm.Instruction{
-				OpCode:  eulvm.CALL,
-				Operand: *uint256.NewInt(uint64(compiledFunc.addr)),
-			})
-			e.compilePopFrame(easm)
+			e.compileFuncCallIntoEasm(easm, expr.as.funcCall)
 			cExp.typee = eulTypeVoid
 		}
 	case eulExprKindStrLit:
@@ -396,6 +414,37 @@ func (e *eulang) compileExprIntoEasm(easm *easm, expr eulExpr) compiledExpr {
 	return cExp
 }
 
+func (e *eulang) compileFuncCallIntoEasm(easm *easm, funcCall eulFuncCall) {
+	//TODO add deffered compiled function addresses resolving later
+	compiledFunc, ok := e.funcs[funcCall.name]
+	if !ok {
+		panic(fmt.Sprintf("undefined compiled function %s", funcCall.name))
+	}
+
+	//compile args
+	{
+		if len(funcCall.args) != len(compiledFunc.params) {
+			log.Fatalf("%s:%d:%d ERROR funcall arity missmatch. Expected '%d' arguments but got '%d' instead ",
+				funcCall.loc.filepath, funcCall.loc.row, funcCall.loc.col, len(compiledFunc.params), len(funcCall.args))
+		}
+		for i, arg := range funcCall.args {
+			param := compiledFunc.params[i]
+			expr := e.compileExprIntoEasm(easm, arg.value)
+			if param.typee != expr.typee {
+				log.Fatalf("%s:%d:%d ERROR funcall type missmatch. Expected '%s' type but got '%s' instead ",
+					expr.loc.filepath, expr.loc.row, expr.loc.col, eulTypes[param.typee], eulTypes[expr.typee])
+			}
+		}
+	}
+	//framez
+	e.compilePushNewFrame(easm)
+	easm.pushInstruction(eulvm.Instruction{
+		OpCode:  eulvm.CALL,
+		Operand: *uint256.NewInt(uint64(compiledFunc.addr)),
+	})
+	e.compilePopFrame(easm)
+}
+
 func (e *eulang) pushNewScope() {
 	scope := eulScope{
 		parent:       e.scope,
@@ -410,12 +459,14 @@ func (e *eulang) popScope() {
 		panic("try pop nil scope")
 	}
 
+	//framez
 	var deallocs uint64
-	for _, varr := range e.scope.compiledVars {
-		if varr.storage == storageKindStack {
-			deallocs += 1 // TODO for now all var have fixed size of 1 machine word (change later?)
+	for _, v := range e.scope.compiledVars {
+		if v.storage == storageKindStack {
+			deallocs += 32
 		}
 	}
+
 	e.frameSize -= deallocs
 
 	e.scope = e.scope.parent
@@ -485,6 +536,7 @@ func (e *eulang) compileReadFrameAddr(easm *easm) {
 		OpCode:  eulvm.PUSH,
 		Operand: e.stackFrameAddr,
 	})
+	fmt.Println("read frame addr returns frame addr", e.stackFrameAddr)
 	easm.pushInstruction(eulvm.Instruction{
 		OpCode: eulvm.MLOAD,
 	})
@@ -524,6 +576,12 @@ func (e *eulang) compileGetVarAddr(easm *easm, cv *compiledVar) {
 	default:
 		panic("compiling other storage types is not implemented yet")
 	}
+}
+
+func (e *eulang) prepareVarStack(easm *easm, stackSize uint) {
+	arr := make([]byte, stackSize*32)
+	easm.pushByteArrToMemory(arr)
+	e.stackFrameAddr = *uint256.NewInt(uint64(len(arr)))
 }
 
 // // TODO euler later can add here function arguments

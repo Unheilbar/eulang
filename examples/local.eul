@@ -1,12 +1,21 @@
-var i: i64;
+
+func test(i: i64) {
+	if i < 44 {
+		write("failed\n");
+	} else {
+		write("success\n");
+	}
+}
 
 func entry() {
 	var i: i64;
-	write("hello\n");
-	i = 40;
-	if i<30{
-		write("hello yopta write 112\n");
+	i = 45;
+	test(i);
+	if i<43{
+		write("failed\n");
+	} else {
+		write("success\n");
 	}
 
-	write("hi hi hi\n");
+	write("passed\n");
 }
