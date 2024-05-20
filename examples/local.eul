@@ -12,7 +12,11 @@ func test(a: i64, b: i64) {
 	} else {
 		write("failed\n");
 	}
-	test2(a, b);
+	var c: i64;
+	var d: i64;
+	c = 17;
+	d = 10;
+	test2(d, c);
 }
 
 func entry() {
