@@ -50,6 +50,22 @@ func (e *easm) pushByteArrToMemory(arr []byte) eulvm.Word {
 	return result
 }
 
+func (e *easm) pushWordToMemory(w eulvm.Word) eulvm.Word {
+	memSize := e.memory.Size()
+	result := *uint256.NewInt(uint64(memSize))
+
+	e.memory.Set32(uint64(e.memory.Size()), w)
+
+	return result
+}
+
+func (e *easm) pushBufferToMemory(buffer []byte) eulvm.Word {
+	result := uint256.NewInt(uint64(e.memory.Size()))
+	e.memory.Set(e.memory.Size(), uint64(len(buffer)), buffer)
+
+	return *result
+}
+
 // returns instruction address
 func (e *easm) pushInstruction(i eulvm.Instruction) int {
 	//TODO euler do we need program capacity?

@@ -122,7 +122,6 @@ func (e *eulang) compileVarIntoEasm(easm *easm, vd eulVarDef, storage varStorage
 	case storageKindStack:
 		e.frameSize += 32 // all var have the size of 1 machine word
 		cv.addr = *uint256.NewInt(e.frameSize)
-		fmt.Println("frame size", e.frameSize)
 	default:
 		panic("other storage kinds are not implemented yet")
 	}
@@ -171,9 +170,17 @@ func (e *eulang) compileFuncDefIntoEasm(easm *easm, fd eulFuncDef) {
 
 	e.compileBlockIntoEasm(easm, &fd.body)
 	e.popScope()
-	easm.pushInstruction(eulvm.Instruction{
-		OpCode: eulvm.RET},
-	)
+
+	//TODO euler later add external modifier
+	if f.name != "entry" {
+		easm.pushInstruction(eulvm.Instruction{
+			OpCode: eulvm.RET},
+		)
+	} else {
+		easm.pushInstruction(eulvm.Instruction{
+			OpCode: eulvm.STOP},
+		)
+	}
 }
 
 func (e *eulang) compileStatementIntoEasm(easm *easm, stmt eulStatement) {
@@ -442,6 +449,7 @@ func (e *eulang) compileFuncCallIntoEasm(easm *easm, funcCall eulFuncCall) {
 		OpCode:  eulvm.CALL,
 		Operand: *uint256.NewInt(uint64(compiledFunc.addr)),
 	})
+
 	e.compilePopFrame(easm)
 }
 
@@ -536,7 +544,6 @@ func (e *eulang) compileReadFrameAddr(easm *easm) {
 		OpCode:  eulvm.PUSH,
 		Operand: e.stackFrameAddr,
 	})
-	fmt.Println("read frame addr returns frame addr", e.stackFrameAddr)
 	easm.pushInstruction(eulvm.Instruction{
 		OpCode: eulvm.MLOAD,
 	})
@@ -580,12 +587,15 @@ func (e *eulang) compileGetVarAddr(easm *easm, cv *compiledVar) {
 
 func (e *eulang) prepareVarStack(easm *easm, stackSize uint) {
 	arr := make([]byte, stackSize*32)
+
 	easm.pushByteArrToMemory(arr)
-	e.stackFrameAddr = *uint256.NewInt(uint64(len(arr)))
+	result := easm.pushWordToMemory(*uint256.NewInt(uint64(stackSize * 32)))
+
+	e.stackFrameAddr = result
 }
 
 // // TODO euler later can add here function arguments
 func (e *eulang) GenerateInput(method string) []byte {
-	k := uint256.NewInt(uint64(e.funcs[method].addr)).Bytes32()
-	return k[:]
+	meth := uint256.NewInt(uint64(e.funcs[method].addr)).Bytes32()
+	return meth[:]
 }

@@ -34,7 +34,29 @@ func (m *Memory) Set32(offset uint64, val uint256.Int) {
 	copy(m.store[offset:offset+32], []byte{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0})
 	// Fill in relevant bits
 	val.WriteToSlice(m.store[offset:])
-	m.size += 32
+	if offset+32 > m.size {
+		m.size = offset + 32
+	}
+}
+
+// Set sets offset + size to value
+func (m *Memory) Set(offset, size uint64, value []byte) {
+	// It's possible the offset is greater than 0 and size equals 0. This is because
+	// the calcMemSize (common.go) could potentially return 0 when size is zero (NO-OP)
+	if size > 0 {
+
+		//TODO write proper check for memory capacity
+		// length of store may never be less than offset + size.
+		// The store should be resized PRIOR to setting the memory
+		if offset+size > uint64(len(m.store)) {
+			panic("invalid memory: store empty")
+		}
+		copy(m.store[offset:offset+size], value)
+	}
+
+	if offset+size > m.size {
+		m.size = offset + size
+	}
 }
 
 func (m *Memory) Size() uint64 {

@@ -1,21 +1,35 @@
 
-func test(i: i64) {
-	if i < 44 {
-		write("failed\n");
-	} else {
-		write("success\n");
+func test2(a: i64, b: i64) {
+	while a < b {
+		b = b+5;
+		write("success t2\n");
 	}
+}
+
+func test(a: i64, b: i64) {
+	if a < b {
+		write("success t\n");
+	} else {
+		write("failed\n");
+	}
+	test2(a, b);
 }
 
 func entry() {
 	var i: i64;
-	i = 45;
-	test(i);
-	if i<43{
-		write("failed\n");
-	} else {
-		write("success\n");
-	}
+	var j: i64;
+	i = 40;
+	j = 50;
+
+	test(i, j);
 
 	write("passed\n");
+
+//	if i<43{
+//		write("failed\n");
+//	} else {
+//		write("success\n");
+//	}
+//
+//	write("passed\n");
 }

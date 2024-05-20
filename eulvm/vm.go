@@ -8,7 +8,7 @@ import (
 	"github.com/holiman/uint256"
 )
 
-const StackCapacity = 32
+const StackCapacity = 33
 
 // input can be accessed by Operations to set program entry point
 type EulVM struct {
@@ -70,6 +70,9 @@ var (
 
 var stopToken = errors.New("program stopped")
 
+var debugCounter int
+var breakPoint int
+
 func executeNext(e *EulVM) error {
 	if e.ip >= len(e.program) {
 		return errIllegalCall
@@ -77,8 +80,13 @@ func executeNext(e *EulVM) error {
 
 	inst := e.program[e.ip]
 	if e.debug {
+		debugCounter++
+		if debugCounter < breakPoint {
+			goto exec
+		}
 		var command string
-		fmt.Scanf("%s", &command)
+		var operand int
+		fmt.Scanf("%s %d", &command, &operand)
 		command = strings.TrimSpace(command)
 		switch command {
 		case "help":
@@ -87,6 +95,7 @@ func executeNext(e *EulVM) error {
 			  stack - dump current stack state
 			  memory - dump current memory state
 			  next_op or ''- show next command for execution
+			  break - go to break point of debuger
 			`)
 			return nil
 		case "stack":
@@ -96,12 +105,17 @@ func executeNext(e *EulVM) error {
 			e.memory.Dump()
 			return nil
 		case "", "next_op":
+		case "break":
+			breakPoint = operand
 		default:
 			fmt.Println("use help to get commands info")
 			return nil
 		}
-		fmt.Println("ip:", e.ip, "-->call:", OpCodes[inst.OpCode], "operand:", inst.Operand.Uint64())
+		fmt.Println("debug point", debugCounter, "ip:", e.ip, "-->call:",
+			OpCodes[inst.OpCode],
+			"operand:", inst.Operand.Uint64())
 	}
+exec:
 	switch inst.OpCode {
 	case PUSH:
 		e.stackSize++
@@ -187,9 +201,7 @@ func executeNext(e *EulVM) error {
 		x := e.stack[e.stackSize]
 		y := e.stack[e.stackSize-1]
 		e.stackSize--
-		fmt.Println("sub", x.Uint64(), y.Uint64())
-		e.stack[e.stackSize] = *x.Sub(&x, &y)
-		fmt.Println("sub res", e.stack[e.stackSize].Uint64())
+		e.stack[e.stackSize] = *y.Sub(&y, &x)
 		e.ip++
 		return nil
 	case NOP:
@@ -210,14 +222,11 @@ func executeNext(e *EulVM) error {
 	case CALL:
 		e.stackSize += 1
 		e.stack[e.stackSize] = *uint256.NewInt(uint64(e.ip + 1)) //set return address of the call
-		fmt.Println("return addr", e.stack[e.stackSize].Uint64(), "stackSize:", e.stackSize)
-		e.ip = int(inst.Operand.Uint64()) //ip jumps to function
+		e.ip = int(inst.Operand.Uint64())                        //ip jumps to function
 		return nil
 	case RET:
 		e.ip = int(e.stack[e.stackSize].Uint64())
 		e.stackSize--
-		fmt.Println("real return addr", e.stack[e.stackSize+1].Uint64())
-		fmt.Println("return to ", e.ip, "stackSize", e.stackSize)
 		return nil
 	case CALLDATA:
 		//TODO later implement load of call parameters

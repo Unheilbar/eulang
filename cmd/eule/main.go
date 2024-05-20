@@ -13,7 +13,8 @@ func main() {
 
 	eulang := compiler.NewEulang()
 	prog := compiler.CompileFromSource(eulang, file)
-	e := eulvm.New(prog).WithDebug()
+	//e := eulvm.New(prog).WithDebug()
+	e := eulvm.New(prog)
 	input := eulang.GenerateInput(os.Args[2])
 
 	err := e.Run(input)
