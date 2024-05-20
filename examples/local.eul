@@ -1,7 +1,7 @@
-
+// Demontrates func calls with arguments
 func test2(a: i64, b: i64) {
 	while a < b {
-		b = b+5;
+		a = a+2;
 		write("success t2\n");
 	}
 }
@@ -22,14 +22,9 @@ func entry() {
 	j = 50;
 
 	test(i, j);
-
-	write("passed\n");
-
-//	if i<43{
-//		write("failed\n");
-//	} else {
-//		write("success\n");
-//	}
-//
-//	write("passed\n");
+	
+	while i < j {
+		write("passed\n");
+		i = i + 3;
+	}
 }

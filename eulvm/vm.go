@@ -97,15 +97,19 @@ func executeNext(e *EulVM) error {
 			  next_op or ''- show next command for execution
 			  break - go to break point of debuger
 			`)
+			debugCounter--
 			return nil
 		case "stack":
 			e.Dump()
+			debugCounter--
 			return nil
 		case "memory":
 			e.memory.Dump()
+			debugCounter--
 			return nil
 		case "", "next_op":
 		case "break":
+			debugCounter--
 			breakPoint = operand
 		default:
 			fmt.Println("use help to get commands info")
@@ -239,8 +243,8 @@ exec:
 		return nil
 	case SWAP:
 		//TODO add stack overflow check
-		a := e.stackSize - 1
-		b := e.stackSize - 1 - int(inst.Operand.Uint64())
+		a := e.stackSize
+		b := e.stackSize - int(inst.Operand.Uint64())
 		e.stack[a], e.stack[b] = e.stack[b], e.stack[a]
 		e.ip++
 		return nil

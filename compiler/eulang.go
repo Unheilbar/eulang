@@ -434,7 +434,8 @@ func (e *eulang) compileFuncCallIntoEasm(easm *easm, funcCall eulFuncCall) {
 			log.Fatalf("%s:%d:%d ERROR funcall arity missmatch. Expected '%d' arguments but got '%d' instead ",
 				funcCall.loc.filepath, funcCall.loc.row, funcCall.loc.col, len(compiledFunc.params), len(funcCall.args))
 		}
-		for i, arg := range funcCall.args {
+		for i := len(funcCall.args) - 1; i >= 0; i-- {
+			arg := funcCall.args[i]
 			param := compiledFunc.params[i]
 			expr := e.compileExprIntoEasm(easm, arg.value)
 			if param.typee != expr.typee {
