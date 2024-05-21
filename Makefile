@@ -5,8 +5,9 @@ run-examples:
 #	go run cmd/eule/main.go examples/while.eul entry
 #	@echo
 #	go run cmd/eule/main.go examples/fcall.eul entry
-	go run cmd/eule/main.go examples/write.eul entry
+#	go run cmd/eule/main.go examples/write.eul entry
 #	go run cmd/eule/main.go examples/local.eul entry
+	go run cmd/eule/main.go examples/bytes32.eul entry
 
 
 

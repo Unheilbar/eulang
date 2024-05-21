@@ -13,4 +13,5 @@ go/src/cmd/compile/README.md guide into go compiler
  - [ ] Add comparison operations for strings, bytes32, etc.
  - [x] Add function visibility identifier (start with all function internal by default, external functions can be called only from outside)
  - [x] Add multiple arguments for writef native function
-
+ - [ ] Add for loops
+ - [ ] Add choice to examples

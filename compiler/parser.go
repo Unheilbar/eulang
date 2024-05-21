@@ -115,14 +115,22 @@ type eulType uint8
 const (
 	eulTypei64 eulType = iota
 	eulTypeVoid
+	eulTypeBytes32
 	// to be continued
 	//...
 	eulTypeCount
 )
 
+var eulTypesView = map[string]eulType{
+	"i64":     eulTypei64,
+	"void":    eulTypeVoid,
+	"bytes32": eulTypeBytes32,
+}
+
 var eulTypes = map[eulType]string{
-	eulTypei64:  "i64",
-	eulTypeVoid: "void",
+	eulTypei64:     "i64",
+	eulTypeVoid:    "void",
+	eulTypeBytes32: "bytes32",
 }
 
 type eulVarDef struct {
@@ -522,7 +530,7 @@ func parseFuncCallArgs(lex *lexer) []eulFuncCallArg {
 	var res []eulFuncCallArg
 
 	lex.expectToken(eulTokenKindOpenParen)
-	// TODO parse fun Call currently supports only 1 argument fix later
+
 	var t token
 	for lex.peek(&t, 0) && t.kind != eulTokenKindCloseParen {
 		res = append(res, eulFuncCallArg{

@@ -1,0 +1,4 @@
+func entry() external {
+	var b: bytes32;
+	b = "123";
+}

@@ -247,8 +247,8 @@ func (e *eulang) compileVarAssignIntoEasm(easm *easm, expr eulVarAssign) {
 	compiledExpr := e.compileExprIntoEasm(easm, expr.value)
 
 	if compiledExpr.typee != vari.etype {
-		log.Fatalf("%s:%d:%d ERROR do not match types on the left and right side in expression '%s'",
-			expr.loc.filepath, expr.loc.row, expr.loc.col, expr.name)
+		log.Fatalf("%s:%d:%d ERROR do not match types on the left and right side in expression '%s'. left side '%s' right '%s'",
+			expr.loc.filepath, expr.loc.row, expr.loc.col, expr.name, eulTypes[vari.etype], eulTypes[compiledExpr.typee])
 	}
 
 	easm.pushInstruction(eulvm.Instruction{
