@@ -19,7 +19,7 @@ func test(a: i64, b: i64) {
 	test2(d, c);
 }
 
-func entry() {
+func entry() external {
 	var i: i64;
 	var j: i64;
 	i = 40;

@@ -93,8 +93,18 @@ type eulBlock struct {
 	statements []eulStatement
 }
 
+type eulFuncModifier uint8
+
+const (
+	eulModifierKindInternal eulFuncModifier = iota
+	eulModifierKindExternal
+	//.. to be continued
+)
+
 type eulFuncDef struct {
-	name   string
+	name     string
+	modifier eulFuncModifier
+
 	body   eulBlock
 	loc    eulLoc
 	params []eulFuncParam
@@ -245,7 +255,26 @@ func parseFuncDef(lex *lexer) eulFuncDef {
 	f.name = t.view
 
 	f.params = parseFuncDefParams(lex)
-	//TODO eulang func def do not support args yet
+
+	//If function has modifier then parse it
+	{
+		var t token
+		lex.peek(&t, 0)
+		if t.kind == eulTokenKindName {
+			t = lex.expectToken(eulTokenKindName)
+			switch t.view {
+			case "external":
+				f.modifier = eulModifierKindExternal
+			case "internal":
+				f.modifier = eulModifierKindInternal
+			default:
+				log.Fatalf("%s:%d:%d undefined modifier '%s'", t.loc.filepath, t.loc.row, t.loc.col, t.view)
+			}
+		} else {
+			// NOTE default modifier is internal
+			f.modifier = eulModifierKindInternal
+		}
+	}
 	f.body = *parseCurlyEulBlock(lex)
 	return f
 }

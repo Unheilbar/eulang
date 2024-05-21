@@ -171,8 +171,7 @@ func (e *eulang) compileFuncDefIntoEasm(easm *easm, fd eulFuncDef) {
 	e.compileBlockIntoEasm(easm, &fd.body)
 	e.popScope()
 
-	//TODO euler later add external modifier
-	if f.name != "entry" {
+	if fd.modifier != eulModifierKindExternal {
 		easm.pushInstruction(eulvm.Instruction{
 			OpCode: eulvm.RET},
 		)
