@@ -273,7 +273,21 @@ func (e *EulVM) Dump() {
 // euler native functions
 const (
 	NativeWrite uint64 = iota + 1
+	NativeWriteF
 )
+
+func (e *EulVM) popInt() int {
+	ret := e.stack[e.stackSize].Uint64()
+	e.stackSize--
+	return int(ret)
+}
+
+func (e *EulVM) popStr() string {
+	size := e.stack[e.stackSize]
+	addr := e.stack[e.stackSize-1]
+	e.stackSize -= 2
+	return string(e.memory.store[addr.Uint64() : addr.Uint64()+size.Uint64()])
+}
 
 func (e *EulVM) execNative(id uint64) error {
 	switch id {
@@ -283,7 +297,42 @@ func (e *EulVM) execNative(id uint64) error {
 		e.stackSize -= 2
 		fmt.Print(string(e.memory.store[addr.Uint64() : addr.Uint64()+size.Uint64()]))
 		return nil
+	case NativeWriteF:
+		// TODO add stack overflow check
+		var args []interface{}
+
+		frmtStr := e.popStr()
+		clone := strings.Clone(frmtStr)
+		for clone != chopFrom(clone, isPercent) {
+			clone = chopFrom(clone, isPercent)
+			if strings.HasPrefix(clone, "%d") {
+				args = append(args, e.popInt())
+				clone = strings.TrimPrefix(clone, "%d")
+			} else if strings.HasPrefix(clone, "%s") {
+				args = append(args, e.popStr())
+				clone = strings.TrimPrefix(clone, "%s")
+				// NOTE add here future formattings
+			} else {
+				clone = strings.TrimPrefix(clone, "%")
+			}
+		}
+
+		fmt.Printf(frmtStr, args...)
+		return nil
 	}
 
 	return errUnknownNative
+}
+
+func isPercent(r rune) bool {
+	return r != '%'
+}
+
+func chopFrom(s string, until func(r rune) bool) string {
+	for i, r := range s {
+		if !until(r) {
+			return s[i:]
+		}
+	}
+	return s
 }

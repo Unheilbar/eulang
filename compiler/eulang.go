@@ -363,14 +363,14 @@ func (e *eulang) compileExprIntoEasm(easm *easm, expr eulExpr) compiledExpr {
 	case eulExprKindFuncCall:
 		// TODO temporary solution hard code just one function
 		if expr.as.funcCall.name == "write" {
-			e.compileExprIntoEasm(easm, expr.as.funcCall.args[0].value)
-			easm.pushInstruction(eulvm.Instruction{
-				OpCode:  eulvm.OpCode(eulvm.NATIVE),
-				Operand: *uint256.NewInt(eulvm.NativeWrite),
-			})
+			e.compileNativeWriteIntoEasm(easm, expr.as.funcCall)
+			cExp.typee = eulTypeVoid
+		} else if expr.as.funcCall.name == "writef" {
+			e.compileNativeWriteFIntoEasm(easm, expr.as.funcCall)
 			cExp.typee = eulTypeVoid
 		} else {
 			e.compileFuncCallIntoEasm(easm, expr.as.funcCall)
+			// TODO we don't support return types yet
 			cExp.typee = eulTypeVoid
 		}
 	case eulExprKindStrLit:
@@ -418,6 +418,28 @@ func (e *eulang) compileExprIntoEasm(easm *easm, expr eulExpr) compiledExpr {
 	}
 
 	return cExp
+}
+
+func (e *eulang) compileNativeWriteFIntoEasm(easm *easm, funcCall eulFuncCall) {
+	// TODO add check format string feats to types in funcCall
+	// 1. Compile args
+	for i := len(funcCall.args) - 1; i >= 0; i-- {
+		arg := funcCall.args[i]
+		e.compileExprIntoEasm(easm, arg.value)
+	}
+
+	easm.pushInstruction(eulvm.Instruction{
+		OpCode:  eulvm.OpCode(eulvm.NATIVE),
+		Operand: *uint256.NewInt(eulvm.NativeWriteF),
+	})
+}
+
+func (e *eulang) compileNativeWriteIntoEasm(easm *easm, funcall eulFuncCall) {
+	e.compileExprIntoEasm(easm, funcall.args[0].value)
+	easm.pushInstruction(eulvm.Instruction{
+		OpCode:  eulvm.OpCode(eulvm.NATIVE),
+		Operand: *uint256.NewInt(eulvm.NativeWrite),
+	})
 }
 
 func (e *eulang) compileFuncCallIntoEasm(easm *easm, funcCall eulFuncCall) {

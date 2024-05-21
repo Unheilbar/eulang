@@ -28,7 +28,7 @@ func entry() external {
 	test(i, j);
 	
 	while i < j {
-		write("passed\n");
+		write("passed %s %d\n");
 		i = i + 3;
 	}
 }
