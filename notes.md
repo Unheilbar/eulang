@@ -9,8 +9,8 @@ go/src/cmd/compile/README.md guide into go compiler
  - [ ] Add mapping for version storage write/read
  - [ ] Add return value for functions
  - [x] Add escape analysis for defining  storing variables to /version storage/permanent storage?/stack/memory
- - [ ] Add binary operations add/sub/div/multi/mod
- - [ ] Add comparison operations for strings, bytes32, etc.
+ - [x] Add binary operations add/sub/div/multi/mod
+ - [x] Add comparison operations for strings, bytes32, etc.
  - [x] Add function visibility identifier (start with all function internal by default, external functions can be called only from outside)
  - [x] Add multiple arguments for writef native function
  - [ ] Add for loops
