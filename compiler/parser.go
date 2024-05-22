@@ -3,6 +3,8 @@ package compiler
 import (
 	"log"
 	"strconv"
+
+	"github.com/ethereum/go-ethereum/common"
 )
 
 var binaryOpTokens = map[eulBinaryOpKind]uint8{
@@ -42,6 +44,7 @@ type eulExprKind uint8
 
 const (
 	eulExprKindStrLit eulExprKind = iota
+	eulExprKindByte32Lit
 	eulExprKindBoolLit
 	eulExprKindFuncCall
 	eulExprKindIntLit
@@ -51,12 +54,13 @@ const (
 )
 
 type eulExprAs struct {
-	strLit   string
-	funcCall eulFuncCall
-	boolean  bool
-	intLit   int64
-	varRead  varRead
-	binaryOp *binaryOp
+	strLit     string
+	funcCall   eulFuncCall
+	boolean    bool
+	intLit     int64
+	varRead    varRead
+	binaryOp   *binaryOp
+	bytes32Lit common.Hash
 	//... to be continued
 }
 

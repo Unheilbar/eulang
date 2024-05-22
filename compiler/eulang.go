@@ -5,6 +5,7 @@ import (
 	"log"
 
 	"github.com/Unheilbar/eulang/eulvm"
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/holiman/uint256"
 )
 
@@ -244,6 +245,16 @@ func (e *eulang) compileVarAssignIntoEasm(easm *easm, expr eulVarAssign) {
 	}
 
 	e.compileGetVarAddr(easm, vari)
+	// TODO maybe later fix
+	if vari.etype == eulTypeBytes32 {
+		expr.value.kind = eulExprKindByte32Lit
+		expr.value.as.bytes32Lit = common.HexToHash(expr.value.as.strLit)
+		if expr.value.as.bytes32Lit.Hex() != expr.value.as.strLit {
+			log.Fatalf("%s:%d:%d ERROR cannot convert str literal '%s' to bytes32",
+				expr.loc.filepath, expr.loc.row, expr.loc.col, expr.value.as.strLit)
+		}
+	}
+
 	compiledExpr := e.compileExprIntoEasm(easm, expr.value)
 
 	if compiledExpr.typee != vari.etype {
@@ -389,6 +400,14 @@ func (e *eulang) compileExprIntoEasm(easm *easm, expr eulExpr) compiledExpr {
 
 		//TODO strings dont have their own type. But for now they're just i64 pointers to memory
 		cExp.typee = eulTypei64
+	case eulExprKindByte32Lit:
+		w := new(uint256.Int)
+		w.SetBytes32(expr.as.bytes32Lit.Bytes())
+		easm.pushInstruction(eulvm.Instruction{
+			OpCode:  eulvm.PUSH,
+			Operand: *w,
+		})
+		cExp.typee = eulTypeBytes32
 	case eulExprKindIntLit:
 		easm.pushInstruction(eulvm.Instruction{
 			OpCode:  eulvm.PUSH,

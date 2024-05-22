@@ -1,4 +1,4 @@
 func entry() external {
 	var b: bytes32;
-	b = "123";
+	b = "0xab12ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
 }
