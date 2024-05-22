@@ -9,8 +9,10 @@ import (
 	"strings"
 )
 
+type eulTokenKind uint8
+
 const (
-	eulTokenKindName uint8 = iota
+	eulTokenKindName eulTokenKind = iota
 	eulTokenKindNumber
 	eulTokenKindOpenParen
 	eulTokenKindCloseParen
@@ -25,6 +27,7 @@ const (
 	eulTokenKindMinus
 	eulTokenKindMult
 	eulTokenKindLt
+	eulTokenKindGt
 	eulTokenKindGe
 	eulTokenKindNe
 	eulTokenKindAnd
@@ -44,14 +47,14 @@ type eulLoc struct {
 }
 
 type token struct {
-	kind uint8
+	kind eulTokenKind
 	view string
 
 	loc eulLoc
 }
 
 type hardcodedToken struct {
-	kind uint8
+	kind eulTokenKind
 	text string
 }
 
@@ -74,9 +77,10 @@ var hardcodedTokens = []hardcodedToken{
 	{eulTokenKindMinus, "-"},
 	{eulTokenKindMult, "*"},
 	{eulTokenKindLt, "<"},
+	{eulTokenKindGt, ">"},
 }
 
-var tokenKindNames = map[uint8]string{
+var tokenKindNames = map[eulTokenKind]string{
 	eulTokenKindName:       "name",
 	eulTokenKindNumber:     "number",
 	eulTokenKindOpenParen:  "(",
@@ -92,6 +96,7 @@ var tokenKindNames = map[uint8]string{
 	eulTokenKindMinus:      "-",
 	eulTokenKindMult:       "*",
 	eulTokenKindLt:         "<",
+	eulTokenKindGt:         ">",
 	eulTokenKindGe:         ">=",
 	eulTokenKindNe:         "!=",
 	eulTokenKindAnd:        "&&",
@@ -209,7 +214,7 @@ func (lex *lexer) tokenByPassPeekBuffer(t *token) bool {
 	return false
 }
 
-func (lex *lexer) expectToken(expKind uint8) token {
+func (lex *lexer) expectToken(expKind eulTokenKind) token {
 	var t token
 
 	if !lex.next(&t) {
@@ -269,7 +274,7 @@ func (lex *lexer) nextLine() {
 	lex.lineStart += len(line) - len(lex.current) //line start includes trimmmed spaces
 }
 
-func (lex *lexer) chopToken(kind uint8, size int) token {
+func (lex *lexer) chopToken(kind eulTokenKind, size int) token {
 	if size > len(lex.current) {
 		panic("invalid chop token call, token size bigger than current line")
 	}

@@ -7,11 +7,6 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
-var binaryOpTokens = map[eulBinaryOpKind]uint8{
-	binaryOpLess: eulTokenKindLt,
-	binaryOpPlus: eulTokenKindPlus,
-}
-
 type eulFuncCallArg struct {
 	value eulExpr
 	//TODO probably makes sense to represent it as linked list so we can iterate through arguments
@@ -39,12 +34,6 @@ type eulIf struct {
 	ethen     *eulBlock
 	elze      *eulBlock //because else is busy by golang
 }
-
-type eulBinaryOpPrecedence uint8
-
-const (
-	eulBinOpPrecedence0 eulBinaryOpPrecedence = iota
-)
 
 type eulExprKind uint8
 
@@ -127,6 +116,7 @@ type eulType uint8
 const (
 	eulTypei64 eulType = iota
 	eulTypeVoid
+	eulTypeBool
 	eulTypeBytes32
 	eulTypeAddress
 	// to be continued
@@ -137,6 +127,7 @@ const (
 var eulTypesView = map[string]eulType{
 	"i64":     eulTypei64,
 	"void":    eulTypeVoid,
+	"bool":    eulTypeBool,
 	"bytes32": eulTypeBytes32,
 	"address": eulTypeAddress,
 }
@@ -144,6 +135,7 @@ var eulTypesView = map[string]eulType{
 var eulTypes = map[eulType]string{
 	eulTypei64:     "i64",
 	eulTypeVoid:    "void",
+	eulTypeBool:    "bool",
 	eulTypeBytes32: "bytes32",
 	eulTypeAddress: "address",
 }
@@ -177,8 +169,15 @@ type eulFuncParam struct {
 type eulBinaryOpKind uint8
 
 const (
-	binaryOpPlus eulBinaryOpKind = iota
-	binaryOpLess
+	binaryOpKindPlus eulBinaryOpKind = iota
+	binaryOpKindLess
+	binaryOpKindGreater
+	binaryOpKindMinus
+	binaryOpKindEqual
+	binaryOpKindNotEqual
+	binaryOpKindAnd
+	binaryOpKindOr
+	binaryOpKindMulti
 
 	countBinaryOpKinds //keep it last
 )
@@ -190,6 +189,75 @@ type binaryOp struct {
 	rhs  eulExpr
 	// TODO
 }
+
+type binaryOpDef struct {
+	prec  eulBinaryOpPrecedence
+	token eulTokenKind
+	kind  eulBinaryOpKind
+}
+
+var binaryOpDefs = map[eulBinaryOpKind]binaryOpDef{
+	// multi/div
+	binaryOpKindMulti: {
+		token: eulTokenKindMult,
+		prec:  eulBinOpPrecedence3,
+		kind:  binaryOpKindMulti,
+	},
+	// arithmetc precedence 2
+	binaryOpKindPlus: {
+		token: eulTokenKindPlus,
+		prec:  eulBinOpPrecedence2,
+		kind:  binaryOpKindPlus,
+	},
+	binaryOpKindMinus: {
+		token: eulTokenKindMinus,
+		prec:  eulBinOpPrecedence2,
+		kind:  binaryOpKindMinus,
+	},
+	// comparison precedence 1
+	binaryOpKindLess: {
+		token: eulTokenKindLt,
+		prec:  eulBinOpPrecedence1,
+		kind:  binaryOpKindLess,
+	},
+	binaryOpKindGreater: {
+		token: eulTokenKindGt,
+		prec:  eulBinOpPrecedence1,
+		kind:  binaryOpKindGreater,
+	},
+	binaryOpKindEqual: {
+		token: eulTokenKindEqEq,
+		prec:  eulBinOpPrecedence1,
+		kind:  binaryOpKindEqual,
+	},
+	binaryOpKindNotEqual: {
+		token: eulTokenKindNe,
+		prec:  eulBinOpPrecedence1,
+		kind:  binaryOpKindNotEqual,
+	},
+	// logical precedence 0
+	binaryOpKindAnd: {
+		token: eulTokenKindAnd,
+		prec:  eulBinOpPrecedence0,
+		kind:  binaryOpKindAnd,
+	},
+	binaryOpKindOr: {
+		token: eulTokenKindOr,
+		prec:  eulBinOpPrecedence0,
+		kind:  binaryOpKindOr,
+	},
+}
+
+type eulBinaryOpPrecedence uint8
+
+const (
+	eulBinOpPrecedence0 eulBinaryOpPrecedence = iota
+	eulBinOpPrecedence1
+	eulBinOpPrecedence2
+	eulBinOpPrecedence3
+
+	eulCountBinaryOpPrecedence
+)
 
 type eulTopKind uint8
 
@@ -479,7 +547,10 @@ func parsePrimaryExpr(lex *lexer) eulExpr {
 		expr.kind = eulExprKindIntLit
 		expr.as.intLit = intLit
 		expr.loc = t.loc
-	// TODO cases of other token kinds
+	case eulTokenKindOpenParen:
+		lex.next(&t)
+		expr = parseEulExpr(lex)
+		lex.expectToken(eulTokenKindCloseParen)
 	default:
 		log.Fatalf("%s:%d:%d no primary expression starts with %s",
 			lex.filepath, lex.row, lex.lineStart, t.view)
@@ -489,13 +560,46 @@ func parsePrimaryExpr(lex *lexer) eulExpr {
 	return expr
 }
 
+func parseEulExprWithPrecedence(lex *lexer, prec eulBinaryOpPrecedence) eulExpr {
+	if prec >= eulCountBinaryOpPrecedence {
+		return parsePrimaryExpr(lex)
+	}
+
+	lhs := parseEulExprWithPrecedence(lex, prec+1)
+	var t token
+	var def binaryOpDef
+	for lex.peek(&t, 0) && binDefByToken(t, &def) && def.prec == prec {
+		ok := lex.next(&t)
+		if !ok {
+			panic("broken parser")
+		}
+		var expr eulExpr
+		expr.loc = t.loc
+		expr.kind = eulExprKindBinaryOp
+		binOp := &binaryOp{}
+
+		{
+			binOp.loc = t.loc
+			binOp.kind = def.kind
+			binOp.lhs = lhs
+			binOp.rhs = parseEulExprWithPrecedence(lex, prec+1)
+		}
+
+		expr.as.binaryOp = binOp
+
+		lhs = expr
+	}
+
+	return lhs
+}
+
 func parseEulExpr(lex *lexer) eulExpr {
 	lhs := parsePrimaryExpr(lex)
 
 	var t token
 	if lex.peek(&t, 0) {
 		for kind := eulBinaryOpKind(0); kind < countBinaryOpKinds; kind++ {
-			if binaryOpTokens[kind] == t.kind {
+			if binaryOpDefs[kind].token == t.kind {
 				ok := lex.next(&t)
 				if !ok {
 					panic("your lexer is broken!!1111")
@@ -575,6 +679,16 @@ func parseEulType(lex *lexer) eulType {
 		tok.loc.filepath, tok.loc.row, tok.loc.col, tok.view)
 
 	return 99
+}
+
+func binDefByToken(t token, def *binaryOpDef) bool {
+	for _, binDef := range binaryOpDefs {
+		if t.kind == binDef.token {
+			*def = binDef
+			return true
+		}
+	}
+	return false
 }
 
 func parseStrLit(lex *lexer) string {

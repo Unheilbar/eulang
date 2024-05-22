@@ -29,6 +29,7 @@ const (
 	GT
 	EQ
 	NOT
+	NEQ
 )
 
 // 0x20 - debug
@@ -58,11 +59,13 @@ var OpCodesView = map[string]OpCode{
 	"NATIVE":    NATIVE,
 	"NOT":       NOT,
 	"LT":        LT,
+	"GT":        GT,
 	"DROP":      DROP,
 	"RET":       RET,
 	"CALLDATA":  CALLDATA,
 	"SWAP":      SWAP,
 	"SUB":       SUB,
+	"NEQ":       NEQ,
 }
 
 var OpCodes = map[OpCode]string{
@@ -89,6 +92,8 @@ var OpCodes = map[OpCode]string{
 	RET:       "RET",
 	SWAP:      "SWAP",
 	SUB:       "SUB",
+	NEQ:       "NEQ",
+	GT:        "GT",
 }
 
 func checkOpCodes() {}

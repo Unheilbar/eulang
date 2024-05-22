@@ -55,7 +55,37 @@ type eulScope struct {
 	compiledVars map[string]compiledVar
 }
 
-// eulang stores all the context of euler compiler (compiled functions, scopes, etc.)
+type compileOp struct {
+	instruction eulvm.Instruction
+	returns     eulType
+}
+
+// TODO
+var binaryOpByType = map[eulType]map[eulBinaryOpKind]compileOp{
+	eulTypeBool: {
+		binaryOpKindAnd: {},
+		binaryOpKindOr:  {},
+	},
+	eulTypeAddress: {
+		binaryOpKindEqual:    {eulvm.Instruction{OpCode: eulvm.EQ}, eulTypeBool},
+		binaryOpKindNotEqual: {eulvm.Instruction{OpCode: eulvm.NEQ}, eulTypeBool},
+	},
+	eulTypeBytes32: {
+		binaryOpKindEqual:    {eulvm.Instruction{OpCode: eulvm.EQ}, eulTypeBool},
+		binaryOpKindNotEqual: {eulvm.Instruction{OpCode: eulvm.NEQ}, eulTypeBool},
+	},
+	eulTypei64: {
+		binaryOpKindEqual:    {eulvm.Instruction{OpCode: eulvm.EQ}, eulTypeBool},
+		binaryOpKindNotEqual: {eulvm.Instruction{OpCode: eulvm.NEQ}, eulTypeBool},
+		binaryOpKindLess:     {eulvm.Instruction{OpCode: eulvm.LT}, eulTypeBool},
+		binaryOpKindGreater:  {eulvm.Instruction{OpCode: eulvm.GT}, eulTypeBool},
+		binaryOpKindMulti:    {},
+		binaryOpKindPlus:     {eulvm.Instruction{OpCode: eulvm.ADD}, eulTypei64},
+		binaryOpKindMinus:    {eulvm.Instruction{OpCode: eulvm.SUB}, eulTypei64},
+	},
+}
+
+// eulang stores all the context of 0euler compiler (compiled functions, scopes, etc.)
 type eulang struct {
 	funcs map[string]compiledFunc
 
@@ -211,8 +241,8 @@ func (e *eulang) compileWhileIntoEasm(easm *easm, w eulWhile) {
 	condExpr := e.compileExprIntoEasm(easm, w.condition)
 	//TODO later make something like (checkCondExpression cause it seems like reusable)
 	//TODO for now we don't have booleans
-	if condExpr.typee != eulTypei64 {
-		log.Fatalf("%s:%d:%d ERROR condition expression type should be boolean, got %s",
+	if condExpr.typee != eulTypeBool {
+		log.Fatalf("%s:%d:%d ERROR while condition expression type should be boolean, got %s",
 			condExpr.loc.filepath, condExpr.loc.row, condExpr.loc.col, eulTypes[condExpr.typee])
 	}
 
@@ -278,48 +308,33 @@ func (e *eulang) compileVarAssignIntoEasm(easm *easm, expr eulVarAssign) {
 
 func (e *eulang) compileBinaryOpIntoEasm(easm *easm, binOp binaryOp) eulType {
 	//TODO in the future probably better to return compiled expression
-	var returnType eulType
-	rhsCompiled := e.compileExprIntoEasm(easm, binOp.rhs)
 	lhsCompiled := e.compileExprIntoEasm(easm, binOp.lhs)
-	{
-		if rhsCompiled.typee != lhsCompiled.typee {
-			log.Fatalf("%s:%d:%d ERROR expression types on left and right side do not match '%s' != '%s'",
-				binOp.loc.filepath, binOp.loc.row, binOp.loc.col, eulTypes[lhsCompiled.typee], eulTypes[rhsCompiled.typee])
-		}
-		if lhsCompiled.typee != eulTypei64 {
-			log.Fatalf("%s:%d:%d ERROR invalid type for compare binary operation '%s'",
-				binOp.loc.filepath, binOp.loc.row, binOp.loc.col, eulTypes[lhsCompiled.typee])
-		}
+	rhsCompiled := e.compileExprIntoEasm(easm, binOp.rhs)
+
+	if rhsCompiled.typee != lhsCompiled.typee {
+		log.Fatalf("%s:%d:%d ERROR expression types on left and right side do not match '%s' != '%s'",
+			binOp.loc.filepath, binOp.loc.row, binOp.loc.col, eulTypes[lhsCompiled.typee], eulTypes[rhsCompiled.typee])
 	}
 
-	switch binOp.kind {
-	case binaryOpLess:
-		//Typecheck TODO will become a separate function after refacting
-		easm.pushInstruction(eulvm.Instruction{
-			OpCode: eulvm.LT,
-		})
+	t := lhsCompiled.typee
 
-		//TODO booleans have no their own type (maybe they don't need one?)
-		returnType = rhsCompiled.typee
-	case binaryOpPlus:
-		easm.pushInstruction(eulvm.Instruction{
-			OpCode: eulvm.ADD,
-		})
+	bOp, ok := binaryOpByType[t][binOp.kind]
 
-		//TODO for now it's the only supported type
-		returnType = rhsCompiled.typee
-	default:
-		panic("compiling bin op unreachable")
+	if !ok {
+		log.Fatalf("%s:%d:%d ERROR impossible binary operation for types '%s' and '%s' ",
+			binOp.loc.filepath, binOp.loc.row, binOp.loc.col, eulTypes[lhsCompiled.typee], eulTypes[rhsCompiled.typee])
 	}
 
-	return returnType
+	easm.pushInstruction(bOp.instruction)
+
+	return bOp.returns
 }
 
 func (e *eulang) compileVarReadIntoEasm(easm *easm, expr varRead) eulType {
 	cvar := e.getCompiledVarByName(expr.name)
 
 	if cvar == nil {
-		log.Fatalf("%s:%d:%d ERROR condition expression type should be boolean, got %s",
+		log.Fatalf("%s:%d:%d ERROR undefined var '%s'",
 			expr.loc.filepath, expr.loc.row, expr.loc.col, expr.name)
 	}
 
@@ -335,9 +350,9 @@ func (e *eulang) compileVarReadIntoEasm(easm *easm, expr varRead) eulType {
 
 func (e *eulang) compileIfIntoEasm(easm *easm, eif eulIf) {
 	condExpr := e.compileExprIntoEasm(easm, eif.condition)
-	if condExpr.typee != eulTypei64 {
-		log.Fatalf("%s:%d:%d ERROR condition expression type should be boolean, got %s",
-			condExpr.loc.filepath, condExpr.loc.row, condExpr.loc.col, eulTypes[condExpr.typee])
+	if condExpr.typee != eulTypeBool {
+		log.Fatalf("%s:%d:%d ERROR if condition expression type should be boolean, got %s",
+			eif.loc.filepath, eif.loc.row, eif.loc.col, eulTypes[condExpr.typee])
 	}
 
 	easm.pushInstruction(eulvm.Instruction{

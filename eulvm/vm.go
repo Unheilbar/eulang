@@ -151,6 +151,15 @@ exec:
 		e.stackSize--
 		e.ip++
 		return nil
+	case NEQ:
+		if !e.stack[e.stackSize].Eq(&e.stack[e.stackSize-1]) {
+			e.stack[e.stackSize-1].SetOne()
+		} else {
+			e.stack[e.stackSize-1].Clear()
+		}
+		e.stackSize--
+		e.ip++
+		return nil
 	case JUMPDEST:
 		// TODO validate pointer for jump instructions (or maybe it's already done?)
 		e.ip = int(inst.Operand.Uint64())
@@ -193,9 +202,21 @@ exec:
 		e.ip++
 		return nil
 	case LT:
-		x := e.stack[e.stackSize]
+		x := e.stack[e.stackSize-1]
+		y := e.stack[e.stackSize]
 		e.stackSize--
-		if x.Lt(&e.stack[e.stackSize]) {
+		if x.Lt(&y) {
+			e.stack[e.stackSize].SetOne()
+		} else {
+			e.stack[e.stackSize].Clear()
+		}
+		e.ip++
+		return nil
+	case GT:
+		x := e.stack[e.stackSize-1]
+		y := e.stack[e.stackSize]
+		e.stackSize--
+		if x.Gt(&y) {
 			e.stack[e.stackSize].SetOne()
 		} else {
 			e.stack[e.stackSize].Clear()
