@@ -594,36 +594,7 @@ func parseEulExprWithPrecedence(lex *lexer, prec eulBinaryOpPrecedence) eulExpr 
 }
 
 func parseEulExpr(lex *lexer) eulExpr {
-	lhs := parsePrimaryExpr(lex)
-
-	var t token
-	if lex.peek(&t, 0) {
-		for kind := eulBinaryOpKind(0); kind < countBinaryOpKinds; kind++ {
-			if binaryOpDefs[kind].token == t.kind {
-				ok := lex.next(&t)
-				if !ok {
-					panic("your lexer is broken!!1111")
-				}
-				var binOp binaryOp
-
-				// Initialize binary op
-				{
-					binOp.loc = t.loc
-					binOp.kind = kind
-					binOp.lhs = lhs
-
-					binOp.rhs = parseEulExpr(lex)
-				}
-
-				var expr eulExpr
-				expr.kind = eulExprKindBinaryOp
-				expr.as.binaryOp = &binOp
-				return expr
-			}
-		}
-	}
-
-	return lhs
+	return parseEulExprWithPrecedence(lex, 0)
 }
 
 func parseFuncCall(lex *lexer) eulFuncCall {

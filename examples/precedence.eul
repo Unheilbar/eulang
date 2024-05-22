@@ -20,7 +20,7 @@ func testPrecedence(a: i64, b: i64) {
 	} else {
 		write("FAIL\n");
 	} 
-	if (b - a) == 7 {
+	if b - a == 7 {
 		write("success sub\n");
 	} else {
 		write("FAIL\n");
