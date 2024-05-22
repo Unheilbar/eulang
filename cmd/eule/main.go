@@ -10,7 +10,6 @@ import (
 
 func main() {
 	file := os.Args[1]
-
 	eulang := compiler.NewEulang()
 	prog := compiler.CompileFromSource(eulang, file)
 	//e := eulvm.New(prog).WithDebug()

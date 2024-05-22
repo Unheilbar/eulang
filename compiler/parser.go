@@ -45,9 +45,10 @@ type eulExprKind uint8
 const (
 	eulExprKindStrLit eulExprKind = iota
 	eulExprKindByte32Lit
+	eulExprKindAddressLit
 	eulExprKindBoolLit
-	eulExprKindFuncCall
 	eulExprKindIntLit
+	eulExprKindFuncCall
 	eulExprKindVarRead
 	eulExprKindBinaryOp
 	//... to be continued
@@ -56,6 +57,7 @@ const (
 type eulExprAs struct {
 	strLit     string
 	funcCall   eulFuncCall
+	addressLit common.Address
 	boolean    bool
 	intLit     int64
 	varRead    varRead
@@ -120,6 +122,7 @@ const (
 	eulTypei64 eulType = iota
 	eulTypeVoid
 	eulTypeBytes32
+	eulTypeAddress
 	// to be continued
 	//...
 	eulTypeCount
@@ -129,12 +132,14 @@ var eulTypesView = map[string]eulType{
 	"i64":     eulTypei64,
 	"void":    eulTypeVoid,
 	"bytes32": eulTypeBytes32,
+	"address": eulTypeAddress,
 }
 
 var eulTypes = map[eulType]string{
 	eulTypei64:     "i64",
 	eulTypeVoid:    "void",
 	eulTypeBytes32: "bytes32",
+	eulTypeAddress: "address",
 }
 
 type eulVarDef struct {

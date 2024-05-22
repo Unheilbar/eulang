@@ -245,7 +245,7 @@ func (e *eulang) compileVarAssignIntoEasm(easm *easm, expr eulVarAssign) {
 	}
 
 	e.compileGetVarAddr(easm, vari)
-	// TODO maybe later fix
+	// TODO maybe refactor its later
 	if vari.etype == eulTypeBytes32 {
 		expr.value.kind = eulExprKindByte32Lit
 		expr.value.as.bytes32Lit = common.HexToHash(expr.value.as.strLit)
@@ -254,6 +254,15 @@ func (e *eulang) compileVarAssignIntoEasm(easm *easm, expr eulVarAssign) {
 				expr.loc.filepath, expr.loc.row, expr.loc.col, expr.value.as.strLit)
 		}
 	}
+	if vari.etype == eulTypeAddress {
+		expr.value.kind = eulExprKindAddressLit
+		expr.value.as.addressLit = common.HexToAddress(expr.value.as.strLit)
+		if !common.IsHexAddress(expr.value.as.strLit) {
+			log.Fatalf("%s:%d:%d ERROR cannot convert str literal '%s' to address",
+				expr.loc.filepath, expr.loc.row, expr.loc.col, expr.value.as.strLit)
+		}
+	}
+	//if vari.etype == eulTyp
 
 	compiledExpr := e.compileExprIntoEasm(easm, expr.value)
 
@@ -408,6 +417,14 @@ func (e *eulang) compileExprIntoEasm(easm *easm, expr eulExpr) compiledExpr {
 			Operand: *w,
 		})
 		cExp.typee = eulTypeBytes32
+	case eulExprKindAddressLit:
+		w := new(uint256.Int)
+		w.SetBytes(expr.as.addressLit.Bytes())
+		easm.pushInstruction(eulvm.Instruction{
+			OpCode:  eulvm.PUSH,
+			Operand: *w,
+		})
+		cExp.typee = eulTypeAddress
 	case eulExprKindIntLit:
 		easm.pushInstruction(eulvm.Instruction{
 			OpCode:  eulvm.PUSH,

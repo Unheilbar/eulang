@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"strings"
 
+	"github.com/ethereum/go-ethereum/common"
 	"github.com/holiman/uint256"
 )
 
@@ -282,11 +283,23 @@ func (e *EulVM) popInt() int {
 	return int(ret)
 }
 
+func (e *EulVM) popHash() common.Hash {
+	ret := e.stack[e.stackSize]
+	e.stackSize--
+	return common.BytesToHash(ret.Bytes())
+}
+
 func (e *EulVM) popStr() string {
 	size := e.stack[e.stackSize]
 	addr := e.stack[e.stackSize-1]
 	e.stackSize -= 2
 	return string(e.memory.store[addr.Uint64() : addr.Uint64()+size.Uint64()])
+}
+
+func (e *EulVM) popAddr() common.Address {
+	ret := e.stack[e.stackSize]
+	e.stackSize--
+	return common.BytesToAddress(ret.Bytes())
 }
 
 func (e *EulVM) execNative(id uint64) error {
@@ -312,6 +325,12 @@ func (e *EulVM) execNative(id uint64) error {
 				args = append(args, e.popStr())
 				clone = strings.TrimPrefix(clone, "%s")
 				// NOTE add here future formattings
+			} else if strings.HasPrefix(clone, "%v") {
+				args = append(args, e.popHash())
+				clone = strings.TrimPrefix(clone, "%v")
+			} else if strings.HasPrefix(clone, "%x") {
+				args = append(args, e.popAddr())
+				clone = strings.TrimPrefix(clone, "%x")
 			} else {
 				clone = strings.TrimPrefix(clone, "%")
 			}
