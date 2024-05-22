@@ -57,7 +57,6 @@ type hardcodedToken struct {
 
 var hardcodedTokens = []hardcodedToken{
 	{eulTokenKindDotDot, ".."},
-	//{eulTokenKindName, "func"}, // all keywords will be handled on the parser level
 	{eulTokenKindEqEq, "=="},
 	{eulTokenKindOr, "||"},
 	{eulTokenKindAnd, "&&"},

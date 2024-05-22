@@ -40,6 +40,12 @@ type eulIf struct {
 	elze      *eulBlock //because else is busy by golang
 }
 
+type eulBinaryOpPrecedence uint8
+
+const (
+	eulBinOpPrecedence0 eulBinaryOpPrecedence = iota
+)
+
 type eulExprKind uint8
 
 const (
