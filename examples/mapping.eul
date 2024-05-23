@@ -1,4 +1,6 @@
 map balances [:bytes32]:i64;
+map limits [:i64]:i64;
+
 
 func entry() external {
 	var key: bytes32;
@@ -8,4 +10,25 @@ func entry() external {
 	val = 20;
 	
 	balances[key] = val;
+	balances[key] = balances[key] + 10;
+
+	writef("map read bytes32 key %v val %d\n", key, balances[key]);
+	
+	var key0: i64;
+	var val0: i64;
+
+	key0 = 35;
+	val0 = 24;
+	limits[key0] = val0;
+	writef("map read i64 key %d val %d\n", key0, limits[key0]);
+	
+	while limits[key0] < 30 {
+		limits[key0] = limits[key0] + 2;
+	}
+	
+	if limits[balances[key]+5] == 30 {
+		write("passed\n");
+	} else {
+		write("failed\n");
+	}
 }

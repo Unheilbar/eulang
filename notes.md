@@ -18,7 +18,9 @@ go/src/cmd/compile/README.md guide into go compiler
  - [ ] Add params to external functions
  - [ ] Add var assignment after declaration
  ##### low priotiy
+ - [ ] Add i8, i64, i128
  - [ ] Add for loops
+ - [ ] Add enums
  - [ ] Add choice to examples
  - [ ] Introduce test utility (run functions with prefix Test)
  - [ ] Add #include directive

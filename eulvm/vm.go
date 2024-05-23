@@ -3,13 +3,20 @@ package eulvm
 import (
 	"errors"
 	"fmt"
+	"hash"
 	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/holiman/uint256"
+	"golang.org/x/crypto/sha3"
 )
 
 const StackCapacity = 33
+
+type keccakState interface {
+	hash.Hash
+	Read([]byte) (int, error)
+}
 
 // input can be accessed by Operations to set program entry point
 type EulVM struct {
@@ -24,6 +31,10 @@ type EulVM struct {
 	stack     [StackCapacity]Word
 	stackSize int
 	memory    *Memory
+
+	hasher       keccakState // Keccak256 hasher instance shared across opcodes
+	hasherBuf    common.Hash // Keccak256 hasher result array shared aross opcodes
+	mapKeyBuffer [64]byte
 
 	debug bool
 }
@@ -41,6 +52,7 @@ func New(prog Program) *EulVM {
 		program: prog.Instrutions,
 		memory:  m,
 		state:   make(map[common.Hash]common.Hash),
+		hasher:  sha3.NewLegacyKeccak256().(keccakState),
 	}
 }
 
@@ -204,19 +216,43 @@ exec:
 		e.stack[e.stackSize].SetBytes(e.memory.store[addr : addr+32])
 		e.ip++
 		return nil
-	case VSTORE:
+	case VSSTORE:
 		val := e.stack[e.stackSize]
 		key := e.stack[e.stackSize-1]
 		e.stackSize -= 2
 		e.state[key.Bytes32()] = val.Bytes32()
 		e.ip++
-		for k, v := range e.state {
-			fmt.Printf("storage k:%s v:%s", k.Hex(), v.Hex())
-		}
 		return nil
-	case VLOAD:
+	case VSLOAD:
 		key := e.stack[e.stackSize].Bytes32()
 		e.stack[e.stackSize].SetBytes(e.state[key].Bytes())
+		e.ip++
+		return nil
+	case MAPVSSTORE:
+		val := e.stack[e.stackSize]
+		key := e.stack[e.stackSize-1].Bytes()
+		copy(e.mapKeyBuffer[:32], key)
+		copy(e.mapKeyBuffer[32:], inst.Operand.Bytes())
+
+		e.hasher.Reset()
+		e.hasher.Write(e.mapKeyBuffer[:])
+		e.hasher.Read(e.hasherBuf[:])
+
+		e.state[e.hasherBuf] = val.Bytes32()
+
+		e.stackSize -= 2
+		e.ip++
+		return nil
+	case MAPVSSLOAD:
+		key := e.stack[e.stackSize].Bytes()
+		copy(e.mapKeyBuffer[:32], key)
+		copy(e.mapKeyBuffer[32:], inst.Operand.Bytes())
+
+		e.hasher.Reset()
+		e.hasher.Write(e.mapKeyBuffer[:])
+		e.hasher.Read(e.hasherBuf[:])
+
+		e.stack[e.stackSize].SetBytes(e.state[e.hasherBuf].Bytes())
 		e.ip++
 		return nil
 	case LT:
