@@ -43,6 +43,12 @@ const (
 	NOP
 )
 
+// 0x40 -state
+const (
+	VSTORE OpCode = iota + 0x40 // store to version storage
+	VLOAD                       // load from version storage
+)
+
 var OpCodesView = map[string]OpCode{
 	"ADD":       ADD,
 	"INPUT":     INPUT,
@@ -70,6 +76,8 @@ var OpCodesView = map[string]OpCode{
 	"NEQ":       NEQ,
 	"AND":       AND,
 	"OR":        OR,
+	"VSTORE":    VSTORE,
+	"VLOAD":     VLOAD,
 }
 
 var OpCodes = map[OpCode]string{
@@ -100,6 +108,8 @@ var OpCodes = map[OpCode]string{
 	GT:        "GT",
 	AND:       "AND",
 	OR:        "OR",
+	VSTORE:    "VSTORE",
+	VLOAD:     "VLOAD",
 }
 
 func checkOpCodes() {}

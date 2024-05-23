@@ -129,6 +129,7 @@ func (e *eulang) compileModuleIntoEasm(easm *easm, module eulModule) {
 }
 
 func (e *eulang) addMapDef(mdef eulMapDef) {
+	// TODO validate key and value types. Only few types are available for usage as map keys/values
 	compMap, ok := e.maps[mdef.name]
 	if ok {
 		log.Fatalf("%s:%d:%d ERROR map '%s' was already declared. First declaration: %s:%d:%d",
@@ -353,7 +354,10 @@ func (e *eulang) compileMapWriteIntoEasm(easm *easm, mwrite eulMapWrite) {
 			mwrite.loc.filepath, mwrite.loc.row, mwrite.loc.col, mwrite.name, eulTypes[mdef.valType], eulTypes[val.typee])
 	}
 
-	//todo compile write
+	// TODO Eulang later add map write for dynamic types
+	easm.PushInstruction(eulvm.Instruction{
+		OpCode: eulvm.VSTORE,
+	})
 }
 
 func (e *eulang) compileBinaryOpIntoEasm(easm *easm, binOp binaryOp) eulType {

@@ -17,6 +17,8 @@ type EulVM struct {
 
 	input []byte
 
+	state map[common.Hash]common.Hash // TODO later use actual stateDB as storage backend. map can be used for temporary map storage inside of smart contract
+
 	ip int
 
 	stack     [StackCapacity]Word
@@ -38,6 +40,7 @@ func New(prog Program) *EulVM {
 	return &EulVM{
 		program: prog.Instrutions,
 		memory:  m,
+		state:   make(map[common.Hash]common.Hash),
 	}
 }
 
@@ -199,6 +202,21 @@ exec:
 		}
 
 		e.stack[e.stackSize].SetBytes(e.memory.store[addr : addr+32])
+		e.ip++
+		return nil
+	case VSTORE:
+		val := e.stack[e.stackSize]
+		key := e.stack[e.stackSize-1]
+		e.stackSize -= 2
+		e.state[key.Bytes32()] = val.Bytes32()
+		e.ip++
+		for k, v := range e.state {
+			fmt.Printf("storage k:%s v:%s", k.Hex(), v.Hex())
+		}
+		return nil
+	case VLOAD:
+		key := e.stack[e.stackSize].Bytes32()
+		e.stack[e.stackSize].SetBytes(e.state[key].Bytes())
 		e.ip++
 		return nil
 	case LT:
