@@ -1,5 +1,11 @@
 map balances [:bytes32]:i64;
 
 func entry() external {
+	var key: bytes32;
+	var val: i64;
+
+	key = "0xa080337ae51c4e064c189e113edd0ba391df9206e2f49db658bb32cf2911730b";
+	val = 20;
 	
+	balances[key] = key;
 }

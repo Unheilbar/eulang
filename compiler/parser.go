@@ -73,6 +73,7 @@ const (
 	eulStmtKindExpr eulStmtKind = iota
 	eulStmtKindIf
 	eulStmtKindVarAssign
+	eulStmtKindMapWrite
 	eulStmtKindWhile
 	eulStmtKindVarDef
 )
@@ -81,6 +82,7 @@ type eulStatementAs struct {
 	expr      eulExpr
 	eif       eulIf
 	varAssign eulVarAssign
+	mapWrite  eulMapWrite
 	while     eulWhile
 	vardef    eulVarDef
 }
@@ -153,6 +155,13 @@ type eulVarDef struct {
 type eulVarAssign struct {
 	name  string
 	value eulExpr
+	loc   eulLoc
+}
+
+type eulMapWrite struct {
+	name  string
+	value eulExpr
+	key   eulExpr
 	loc   eulLoc
 }
 
@@ -496,12 +505,19 @@ func parseEulStmt(lex *lexer) eulStatement {
 				stmt.as.varAssign = parseVarAssign(lex)
 				lex.expectToken(eulTokenKindSemicolon)
 				return stmt
+			} else if nt.kind == eulTokenKindOpenBrack {
+				var stmt eulStatement
+				stmt.kind = eulStmtKindMapWrite
+
+				stmt.as.mapWrite = parseMapWrite(lex)
+
+				lex.expectToken(eulTokenKindSemicolon)
+				return stmt
 			}
 		}
 	}
 
 	// if it's still there then just parse it as a statement
-
 	var stmt eulStatement
 	stmt.kind = eulStmtKindExpr
 	stmt.as.expr = parseEulExpr(lex)
@@ -533,6 +549,21 @@ func parseVarAssign(lex *lexer) eulVarAssign {
 	vas.value = parseEulExpr(lex)
 	vas.loc = t.loc
 	return vas
+}
+
+func parseMapWrite(lex *lexer) eulMapWrite {
+	var mwrite eulMapWrite
+
+	mwrite.name = lex.expectToken(eulTokenKindName).view
+	lex.expectToken(eulTokenKindOpenBrack)
+	mwrite.key = parseEulExpr(lex)
+	lex.expectToken(eulTokenKindCloseBrack)
+	t := lex.expectToken(eulTokenKindEq)
+
+	mwrite.loc = t.loc
+	mwrite.value = parseEulExpr(lex)
+
+	return mwrite
 }
 
 func parsePrimaryExpr(lex *lexer) eulExpr {

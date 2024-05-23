@@ -16,6 +16,13 @@ type eulGlobalVar struct {
 	name  string
 }
 
+type compiledMap struct {
+	loc     eulLoc
+	name    string
+	keyType eulType
+	valType eulType
+}
+
 type compiledFunc struct {
 	loc    eulLoc
 	addr   int
@@ -88,6 +95,7 @@ var binaryOpByType = map[eulType]map[eulBinaryOpKind]compileOp{
 // eulang stores all the context of 0euler compiler (compiled functions, scopes, etc.)
 type eulang struct {
 	funcs map[string]compiledFunc
+	maps  map[string]compiledMap
 
 	scope *eulScope
 
@@ -101,6 +109,7 @@ func NewEulang() *eulang {
 			compiledVars: make(map[string]compiledVar),
 		},
 		funcs: make(map[string]compiledFunc),
+		maps:  make(map[string]compiledMap),
 	}
 }
 
@@ -112,10 +121,25 @@ func (e *eulang) compileModuleIntoEasm(easm *easm, module eulModule) {
 		case eulTopKindVar:
 			e.compileVarDefIntoEasm(easm, top.as.vdef, storageKindStatic)
 		case eulTopKindMap:
-			fmt.Println("find map", top.as.mdef.name)
+			e.addMapDef(top.as.mdef)
 		default:
 			panic("try to compile unexpected top kind")
 		}
+	}
+}
+
+func (e *eulang) addMapDef(mdef eulMapDef) {
+	compMap, ok := e.maps[mdef.name]
+	if ok {
+		log.Fatalf("%s:%d:%d ERROR map '%s' was already declared. First declaration: %s:%d:%d",
+			mdef.loc.filepath, mdef.loc.row, mdef.loc.col, mdef.name, compMap.loc.filepath, compMap.loc.row, compMap.loc.col)
+	}
+
+	e.maps[mdef.name] = compiledMap{
+		loc:     mdef.loc,
+		name:    mdef.name,
+		keyType: mdef.keyType,
+		valType: mdef.valType,
 	}
 }
 
@@ -234,6 +258,8 @@ func (e *eulang) compileStatementIntoEasm(easm *easm, stmt eulStatement) {
 	case eulStmtKindVarDef:
 		// TODO statements as vars should be compiling into stack storage for compile-time known variables
 		e.compileVarDefIntoEasm(easm, stmt.as.vardef, storageKindStack)
+	case eulStmtKindMapWrite:
+		e.compileMapWriteIntoEasm(easm, stmt.as.mapWrite)
 	default:
 		panic(fmt.Sprintf("stmt kind doesn't exist kind %d", stmt.kind))
 	}
@@ -306,6 +332,28 @@ func (e *eulang) compileVarAssignIntoEasm(easm *easm, expr eulVarAssign) {
 	easm.pushInstruction(eulvm.Instruction{
 		OpCode: eulvm.MSTORE256,
 	})
+}
+
+func (e *eulang) compileMapWriteIntoEasm(easm *easm, mwrite eulMapWrite) {
+	mdef, ok := e.maps[mwrite.name]
+	if !ok {
+		log.Fatalf("%s:%d:%d ERROR cannot write into undefined map '%s'",
+			mwrite.loc.filepath, mwrite.loc.row, mwrite.loc.col, mwrite.name)
+	}
+
+	key := e.compileExprIntoEasm(easm, mwrite.key)
+	val := e.compileExprIntoEasm(easm, mwrite.value)
+
+	if mdef.keyType != key.typee {
+		log.Fatalf("%s:%d:%d ERROR map '%s' write key type doesnt match. expected '%s' but got '%s'",
+			mwrite.loc.filepath, mwrite.loc.row, mwrite.loc.col, mwrite.name, eulTypes[mdef.keyType], eulTypes[key.typee])
+	}
+	if mdef.valType != val.typee {
+		log.Fatalf("%s:%d:%d ERROR map '%s' write val type doesn't match. expected '%s' but got '%s'",
+			mwrite.loc.filepath, mwrite.loc.row, mwrite.loc.col, mwrite.name, eulTypes[mdef.valType], eulTypes[val.typee])
+	}
+
+	//todo compile write
 }
 
 func (e *eulang) compileBinaryOpIntoEasm(easm *easm, binOp binaryOp) eulType {
