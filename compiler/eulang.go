@@ -111,6 +111,8 @@ func (e *eulang) compileModuleIntoEasm(easm *easm, module eulModule) {
 			e.compileFuncDefIntoEasm(easm, top.as.fdef)
 		case eulTopKindVar:
 			e.compileVarDefIntoEasm(easm, top.as.vdef, storageKindStatic)
+		case eulTopKindMap:
+			fmt.Println("find map", top.as.mdef.name)
 		default:
 			panic("try to compile unexpected top kind")
 		}

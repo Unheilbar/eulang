@@ -121,6 +121,7 @@ const (
 	eulTypeAddress
 	// to be continued
 	//...
+
 	eulTypeCount
 )
 
@@ -259,16 +260,26 @@ const (
 	eulCountBinaryOpPrecedence
 )
 
+type eulMapDef struct {
+	loc     eulLoc
+	name    string
+	keyType eulType
+	valType eulType
+	// TODO later add storage kind for maps
+}
+
 type eulTopKind uint8
 
 const (
 	eulTopKindFunc = iota
 	eulTopKindVar
+	eulTopKindMap
 )
 
 type eulTopAs struct {
 	vdef eulVarDef
 	fdef eulFuncDef
+	mdef eulMapDef
 }
 
 type eulTop struct {
@@ -301,6 +312,11 @@ func parseEulModule(lex *lexer) eulModule {
 
 			top.as.vdef = vdef
 			top.kind = eulTopKindVar
+		case "map":
+			mdef := parseMapDef(lex)
+
+			top.as.mdef = mdef
+			top.kind = eulTopKindMap
 		default:
 			log.Fatalf("%s:%d:%d expected module definitions but got keyword %s", t.loc.filepath, t.loc.row, t.loc.col, t.view)
 		}
@@ -335,6 +351,22 @@ func parseVarDef(lex *lexer) eulVarDef {
 	lex.expectToken(eulTokenKindSemicolon)
 
 	return vdef
+}
+
+func parseMapDef(lex *lexer) eulMapDef {
+	var mdef eulMapDef
+	lex.expectKeyword("map")
+	tok := lex.expectToken(eulTokenKindName)
+	mdef.loc = tok.loc
+	mdef.name = tok.view
+
+	lex.expectToken(eulTokenKindOpenBrack)
+	mdef.keyType = parseEulType(lex)
+	lex.expectToken(eulTokenKindCloseBrack)
+	mdef.valType = parseEulType(lex)
+
+	lex.expectToken(eulTokenKindSemicolon)
+	return mdef
 }
 
 func parseFuncDef(lex *lexer) eulFuncDef {

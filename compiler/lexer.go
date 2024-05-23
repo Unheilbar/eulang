@@ -13,6 +13,8 @@ type eulTokenKind uint8
 
 const (
 	eulTokenKindName eulTokenKind = iota
+	eulTokenKindOpenBrack
+	eulTokenKindCloseBrack
 	eulTokenKindNumber
 	eulTokenKindOpenParen
 	eulTokenKindCloseParen
@@ -78,6 +80,8 @@ var hardcodedTokens = []hardcodedToken{
 	{eulTokenKindMult, "*"},
 	{eulTokenKindLt, "<"},
 	{eulTokenKindGt, ">"},
+	{eulTokenKindOpenBrack, "["},
+	{eulTokenKindCloseBrack, "]"},
 }
 
 var tokenKindNames = map[eulTokenKind]string{
@@ -103,6 +107,8 @@ var tokenKindNames = map[eulTokenKind]string{
 	eulTokenKindOr:         "||",
 	eulTokenKindDotDot:     "..",
 	eulTokenKindLitStr:     "string literal",
+	eulTokenKindOpenBrack:  "[",
+	eulTokenKindCloseBrack: "]",
 }
 
 type peekBuffer struct {
