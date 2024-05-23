@@ -29,6 +29,7 @@ type compiledFunc struct {
 	name   string
 	params []eulFuncParam
 	//TODO later extend with arguments and return type info
+	modifier eulFuncModifier
 }
 
 type compiledExpr struct {
@@ -194,36 +195,19 @@ func (e *eulang) compileFuncDefIntoEasm(easm *easm, fd eulFuncDef) {
 		log.Fatalf("%s:%d:%d ERROR double declaration. func '%s' was already defined",
 			fd.loc.filepath, fd.loc.row, fd.loc.col, fd.name)
 	}
-
 	f.addr = easm.program.Size()
 	f.name = fd.name
 	f.loc = fd.loc
 	f.params = fd.params
 	e.funcs[f.name] = f
+	f.modifier = fd.modifier
 	e.pushNewScope()
 
 	// compile func params
-	{
-		for _, param := range fd.params {
-			var vd eulVarDef
-			vd.name = param.name
-			vd.loc = param.loc
-			vd.etype = param.typee
-
-			varr := e.compileVarIntoEasm(easm, vd, storageKindStack)
-			easm.pushInstruction(eulvm.Instruction{
-				OpCode:  eulvm.SWAP,
-				Operand: *uint256.NewInt(1),
-			})
-			e.compileGetVarAddr(easm, &varr)
-			easm.pushInstruction(eulvm.Instruction{
-				OpCode:  eulvm.SWAP,
-				Operand: *uint256.NewInt(1),
-			})
-			easm.PushInstruction(eulvm.Instruction{
-				OpCode: eulvm.MSTORE256,
-			})
-		}
+	if fd.modifier == eulModifierKindExternal && len(fd.params) != 0 {
+		panic("external modifier parameters aren't supported yet")
+	} else {
+		e.compileInternalFuncParams(easm, fd.params)
 	}
 
 	e.compileBlockIntoEasm(easm, &fd.body)
@@ -237,6 +221,29 @@ func (e *eulang) compileFuncDefIntoEasm(easm *easm, fd eulFuncDef) {
 		easm.pushInstruction(eulvm.Instruction{
 			OpCode: eulvm.STOP},
 		)
+	}
+}
+
+func (e *eulang) compileInternalFuncParams(easm *easm, params []eulFuncParam) {
+	for _, param := range params {
+		var vd eulVarDef
+		vd.name = param.name
+		vd.loc = param.loc
+		vd.etype = param.typee
+
+		varr := e.compileVarIntoEasm(easm, vd, storageKindStack)
+		easm.pushInstruction(eulvm.Instruction{
+			OpCode:  eulvm.SWAP,
+			Operand: *uint256.NewInt(1),
+		})
+		e.compileGetVarAddr(easm, &varr)
+		easm.pushInstruction(eulvm.Instruction{
+			OpCode:  eulvm.SWAP,
+			Operand: *uint256.NewInt(1),
+		})
+		easm.PushInstruction(eulvm.Instruction{
+			OpCode: eulvm.MSTORE256,
+		})
 	}
 }
 
@@ -591,6 +598,10 @@ func (e *eulang) compileFuncCallIntoEasm(easm *easm, funcCall eulFuncCall) {
 	compiledFunc, ok := e.funcs[funcCall.name]
 	if !ok {
 		panic(fmt.Sprintf("undefined compiled function %s", funcCall.name))
+	}
+	if compiledFunc.modifier == eulModifierKindExternal {
+		log.Fatalf("%s:%d:%d ERROR calling func with external modifier is forbidden",
+			funcCall.loc.filepath, funcCall.loc.row, funcCall.loc.col)
 	}
 
 	//compile args
