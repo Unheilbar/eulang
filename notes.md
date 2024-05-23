@@ -7,7 +7,7 @@ go/src/cmd/compile/README.md guide into go compiler
  - [x] Add scopes and support for local variables
  - [x] Add support for compiling function arguments (parsing already introduced)
  - [x] Add types bytes32, address
- - [ ] Add mapping for version storage write/read
+ - [x] Add mapping for version storage write/read (without state backend yet)
  - [ ] Add return value for functions
  - [x] Add escape analysis for defining  storing variables to /version storage/permanent storage?/stack/memory
  - [x] Add binary operations add/sub/div/multi/mod
