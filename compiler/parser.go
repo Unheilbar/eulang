@@ -594,7 +594,10 @@ func parsePrimaryExpr(lex *lexer) eulExpr {
 				expr.loc = t.loc
 				expr.kind = eulExprKindFuncCall
 				expr.as.funcCall = funcall
+			} else if nextTok.kind == eulTokenKindOpenBrack {
+
 			} else {
+				// It's most likely var read
 				expr.kind = eulExprKindVarRead
 				expr.loc = t.loc
 				expr.as.varRead = parseVarRead(lex)
