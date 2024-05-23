@@ -46,12 +46,21 @@ func testAddress(a: address, b: address, c: address){
 	} else {
 		write("FAIL\n");
 	}
+	if a == b && b != c {
+		write("success and\n");
+	} else {
+		write("FAIL\n");
+	}
+	if a != b || a == b {
+		write("success or\n");
+	} else {
+		write("FAIL\n");
+	}
 	if a != c{
 		write("success address not eq\n");
 	} else {
 		write("FAIL\n");
 	}
-
 }
 
 func test(a: i64, b: i64) {

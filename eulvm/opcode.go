@@ -30,6 +30,8 @@ const (
 	EQ
 	NOT
 	NEQ
+	AND
+	OR
 )
 
 // 0x20 - debug
@@ -66,6 +68,8 @@ var OpCodesView = map[string]OpCode{
 	"SWAP":      SWAP,
 	"SUB":       SUB,
 	"NEQ":       NEQ,
+	"AND":       AND,
+	"OR":        OR,
 }
 
 var OpCodes = map[OpCode]string{
@@ -94,6 +98,8 @@ var OpCodes = map[OpCode]string{
 	SUB:       "SUB",
 	NEQ:       "NEQ",
 	GT:        "GT",
+	AND:       "AND",
+	OR:        "OR",
 }
 
 func checkOpCodes() {}

@@ -63,8 +63,8 @@ type compileOp struct {
 // TODO
 var binaryOpByType = map[eulType]map[eulBinaryOpKind]compileOp{
 	eulTypeBool: {
-		binaryOpKindAnd: {},
-		binaryOpKindOr:  {},
+		binaryOpKindAnd: {eulvm.Instruction{OpCode: eulvm.AND}, eulTypeBool},
+		binaryOpKindOr:  {eulvm.Instruction{OpCode: eulvm.OR}, eulTypeBool},
 	},
 	eulTypeAddress: {
 		binaryOpKindEqual:    {eulvm.Instruction{OpCode: eulvm.EQ}, eulTypeBool},

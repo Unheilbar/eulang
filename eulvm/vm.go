@@ -230,6 +230,20 @@ exec:
 		e.stack[e.stackSize] = *y.Sub(&y, &x)
 		e.ip++
 		return nil
+	case AND:
+		x := e.stack[e.stackSize]
+		y := e.stack[e.stackSize-1]
+		e.stackSize--
+		e.stack[e.stackSize] = *y.And(&y, &x)
+		e.ip++
+		return nil
+	case OR:
+		x := e.stack[e.stackSize]
+		y := e.stack[e.stackSize-1]
+		e.stackSize--
+		e.stack[e.stackSize] = *y.Or(&y, &x)
+		e.ip++
+		return nil
 	case NOP:
 		e.ip++
 		return nil
