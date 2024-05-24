@@ -364,8 +364,6 @@ func parseVarDef(lex *lexer) eulVarDef {
 		}
 	}
 
-	//lex.expectToken(eulTokenKindSemicolon)
-
 	return vdef
 }
 
@@ -381,7 +379,6 @@ func parseMapDef(lex *lexer) eulMapDef {
 	lex.expectToken(eulTokenKindCloseBrack)
 	mdef.valType = parseEulType(lex)
 
-	//lex.expectToken(eulTokenKindSemicolon)
 	return mdef
 }
 
@@ -510,15 +507,12 @@ func parseEulStmt(lex *lexer) eulStatement {
 				stmt.kind = eulStmtKindVarAssign
 
 				stmt.as.varAssign = parseVarAssign(lex)
-				//lex.expectToken(eulTokenKindSemicolon)
 				return stmt
 			} else if nt.kind == eulTokenKindOpenBrack {
 				var stmt eulStatement
 				stmt.kind = eulStmtKindMapWrite
 
 				stmt.as.mapWrite = parseMapWrite(lex)
-
-				//lex.expectToken(eulTokenKindSemicolon)
 				return stmt
 			}
 		}
@@ -528,7 +522,6 @@ func parseEulStmt(lex *lexer) eulStatement {
 	var stmt eulStatement
 	stmt.kind = eulStmtKindExpr
 	stmt.as.expr = parseEulExpr(lex)
-	//lex.expectToken(eulTokenKindSemicolon)
 
 	return stmt
 }
@@ -722,8 +715,6 @@ func parseFuncCallArgs(lex *lexer) []eulFuncCallArg {
 }
 
 func parseEulType(lex *lexer) eulType {
-	//lex.expectToken(eulTokenKindColon)
-
 	tok := lex.expectToken(eulTokenKindName)
 	for typee, view := range eulTypes {
 		if tok.view == view {
