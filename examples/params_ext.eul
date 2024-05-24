@@ -1,5 +1,5 @@
 func test(i i64, is bool, addr address, h bytes32){
-	writef("int %d, addr %x h %v bool %d", i, addr, h, is)
+	writef("int %d, addr %x h %v bool %d \n", i, addr, h, is)
 }
 
 func entry(aba i64, is bool, addr address, h bytes32) external {
