@@ -8,8 +8,8 @@ run-examples:
 #	go run cmd/eule/main.go examples/write.eul entry
 #	go run cmd/eule/main.go examples/local.eul entry
 #	go run cmd/eule/main.go examples/bytes32.eul entry
-#	go run cmd/eule/main.go examples/precedence.eul entry
-	go run cmd/eule/main.go examples/mapping.eul entry
+	go run cmd/eule/main.go examples/precedence.eul entry
+#	go run cmd/eule/main.go examples/mapping.eul entry
 
 
 
