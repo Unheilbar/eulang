@@ -1,11 +1,7 @@
-func test(a: i64, b: i64){
-	writef("hello %d\n", a-b);
+func test(i: i64, is: bool, addr: address, h: bytes32){
+	writef("int %d, addr %x h %v bool %d", i, addr, h, is);
 }
 
-func entry(a: i64) external {
-	var i: i64;
-	var h: i64;
-	i = 10;
-	h = 4;
-	test(i, h);
+func entry(aba: i64, is: bool, addr: address, h: bytes32) external {
+	test(aba, is, addr, h);
 }

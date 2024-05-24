@@ -331,6 +331,13 @@ exec:
 
 		e.ip = int(addr.Uint64()) // set instruction pointer to entry function
 		return nil
+	case DATALOAD:
+		//TODO boundary cheks
+		from := e.stack[e.stackSize].Uint64()
+		val := e.input[from : from+WordLength.Uint64()]
+		e.stack[e.stackSize].SetBytes(val)
+		e.ip++
+		return nil
 	case SWAP:
 		//TODO add stack overflow check
 		a := e.stackSize

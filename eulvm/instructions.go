@@ -12,6 +12,8 @@ import "github.com/holiman/uint256"
 }*/
 type Word = uint256.Int
 
+var WordLength = *uint256.NewInt(32)
+
 type Instruction struct {
 	OpCode  OpCode
 	Operand Word
