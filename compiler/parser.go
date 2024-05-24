@@ -381,7 +381,7 @@ func parseMapDef(lex *lexer) eulMapDef {
 	lex.expectToken(eulTokenKindCloseBrack)
 	mdef.valType = parseEulType(lex)
 
-	lex.expectToken(eulTokenKindSemicolon)
+	//lex.expectToken(eulTokenKindSemicolon)
 	return mdef
 }
 
@@ -518,7 +518,7 @@ func parseEulStmt(lex *lexer) eulStatement {
 
 				stmt.as.mapWrite = parseMapWrite(lex)
 
-				lex.expectToken(eulTokenKindSemicolon)
+				//lex.expectToken(eulTokenKindSemicolon)
 				return stmt
 			}
 		}

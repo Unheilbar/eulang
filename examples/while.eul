@@ -1,16 +1,16 @@
-var i: i64;
+var i i64
 
 func foo() {
-	write("bar\n");
+	write("bar\n")
 }
 
-func entry() {
-	i = 2;
-	while i<10{
-		i=i+5;
-		foo();
+func entry() external {
+	i = 2
+	while i < 10{
+		i = i + 5
+		foo()
 	}
-	write("hello this is eulang. golang embedded interpreter programming language! and this string is longer than 32 bytes which kind of important for my test case\n");
+	write("hello this is eulang. golang embedded interpreter programming language! and this string is longer than 32 bytes which kind of important for my test case\n")
 }
 
 

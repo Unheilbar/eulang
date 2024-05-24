@@ -1,10 +1,10 @@
-func main(){
+func main() external {
     if (true) {
-	write("eulang rules");
-	write("then second statement");
+	    write("eulang rules")
+	    write("then second statement")
     } else {
-    	write ("eulang sucks");
-    	write ("else second statement");
+    	write ("eulang sucks")
+    	write ("else second statement")
     }
-    write("i've passed else");
+    write("i've passed else")
 } 
