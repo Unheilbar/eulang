@@ -88,7 +88,6 @@ func test(a i64, b i64) {
 	avar3 = "0x0000000000000000000000000000000000000000"
 
 	testAddress(avar1, avar2, avar3)
-	writef("new zhopa %d: /n", val1)
 }
 
 func entry() external {
