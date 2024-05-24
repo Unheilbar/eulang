@@ -7,7 +7,7 @@ go/src/cmd/compile/README.md guide into go compiler
  - [x] Add scopes and support for local variables
  - [x] Add support for compiling function arguments (parsing already introduced)
  - [x] Add types bytes32, address
- - [ ] Add mapping for version storage write/read
+ - [x] Add mapping for version storage write/read (without state backend yet)
  - [ ] Add return value for functions
  - [x] Add escape analysis for defining  storing variables to /version storage/permanent storage?/stack/memory
  - [x] Add binary operations add/sub/div/multi/mod
@@ -18,7 +18,9 @@ go/src/cmd/compile/README.md guide into go compiler
  - [ ] Add params to external functions
  - [ ] Add var assignment after declaration
  ##### low priotiy
+ - [ ] Add i8, i64, i128
  - [ ] Add for loops
+ - [ ] Add enums
  - [ ] Add choice to examples
  - [ ] Introduce test utility (run functions with prefix Test)
  - [ ] Add #include directive

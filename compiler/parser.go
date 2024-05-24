@@ -39,12 +39,13 @@ type eulExprKind uint8
 
 const (
 	eulExprKindStrLit eulExprKind = iota
-	eulExprKindByte32Lit
+	eulExprKindBytes32Lit
 	eulExprKindAddressLit
 	eulExprKindBoolLit
 	eulExprKindIntLit
 	eulExprKindFuncCall
 	eulExprKindVarRead
+	eulExprKindMapRead
 	eulExprKindBinaryOp
 	//... to be continued
 )
@@ -56,6 +57,7 @@ type eulExprAs struct {
 	boolean    bool
 	intLit     int64
 	varRead    varRead
+	mapRead    *mapRead
 	binaryOp   *binaryOp
 	bytes32Lit common.Hash
 	//... to be continued
@@ -167,6 +169,12 @@ type eulMapWrite struct {
 
 type varRead struct {
 	name string
+	loc  eulLoc
+}
+
+type mapRead struct {
+	name string
+	key  eulExpr
 	loc  eulLoc
 }
 
@@ -331,7 +339,6 @@ func parseEulModule(lex *lexer) eulModule {
 		}
 		mod.tops = append(mod.tops, top)
 	}
-
 	return mod
 }
 
@@ -594,7 +601,13 @@ func parsePrimaryExpr(lex *lexer) eulExpr {
 				expr.loc = t.loc
 				expr.kind = eulExprKindFuncCall
 				expr.as.funcCall = funcall
+			} else if nextTok.kind == eulTokenKindOpenBrack {
+				mapRead := parseMapRead(lex)
+				expr.loc = t.loc
+				expr.kind = eulExprKindMapRead
+				expr.as.mapRead = &mapRead
 			} else {
+				// It's most likely var read
 				expr.kind = eulExprKindVarRead
 				expr.loc = t.loc
 				expr.as.varRead = parseVarRead(lex)
@@ -669,6 +682,15 @@ func parseFuncCall(lex *lexer) eulFuncCall {
 	funcCall.args = parseFuncCallArgs(lex)
 
 	return funcCall
+}
+func parseMapRead(lex *lexer) mapRead {
+	var mr mapRead
+	mr.name = lex.expectToken(eulTokenKindName).view
+	lex.expectToken(eulTokenKindOpenBrack)
+	mr.key = parseEulExpr(lex)
+	mr.loc = mr.key.loc
+	lex.expectToken(eulTokenKindCloseBrack)
+	return mr
 }
 
 func parseVarRead(lex *lexer) varRead {

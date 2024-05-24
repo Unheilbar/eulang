@@ -129,6 +129,7 @@ func (e *eulang) compileModuleIntoEasm(easm *easm, module eulModule) {
 }
 
 func (e *eulang) addMapDef(mdef eulMapDef) {
+	// TODO validate key and value types. Only few types are available for usage as map keys/values
 	compMap, ok := e.maps[mdef.name]
 	if ok {
 		log.Fatalf("%s:%d:%d ERROR map '%s' was already declared. First declaration: %s:%d:%d",
@@ -303,9 +304,10 @@ func (e *eulang) compileVarAssignIntoEasm(easm *easm, expr eulVarAssign) {
 	}
 
 	e.compileGetVarAddr(easm, vari)
+
 	// TODO maybe refactor its later
 	if vari.etype == eulTypeBytes32 {
-		expr.value.kind = eulExprKindByte32Lit
+		expr.value.kind = eulExprKindBytes32Lit
 		expr.value.as.bytes32Lit = common.HexToHash(expr.value.as.strLit)
 		if expr.value.as.bytes32Lit.Hex() != expr.value.as.strLit {
 			log.Fatalf("%s:%d:%d ERROR cannot convert str literal '%s' to bytes32",
@@ -341,6 +343,12 @@ func (e *eulang) compileMapWriteIntoEasm(easm *easm, mwrite eulMapWrite) {
 			mwrite.loc.filepath, mwrite.loc.row, mwrite.loc.col, mwrite.name)
 	}
 
+	mapprefix := strToWords(fmt.Sprint(mdef.name, "."))
+	if len(mapprefix) > 1 {
+		log.Fatalf("%s:%d:%d ERROR map '%s' name is too long",
+			mwrite.loc.filepath, mwrite.loc.row, mwrite.loc.col, mwrite.name)
+	}
+
 	key := e.compileExprIntoEasm(easm, mwrite.key)
 	val := e.compileExprIntoEasm(easm, mwrite.value)
 
@@ -353,7 +361,11 @@ func (e *eulang) compileMapWriteIntoEasm(easm *easm, mwrite eulMapWrite) {
 			mwrite.loc.filepath, mwrite.loc.row, mwrite.loc.col, mwrite.name, eulTypes[mdef.valType], eulTypes[val.typee])
 	}
 
-	//todo compile write
+	// TODO Eulang later add map write for dynamic types (do we need it?)
+	easm.PushInstruction(eulvm.Instruction{
+		OpCode:  eulvm.MAPVSSTORE,
+		Operand: mapprefix[0],
+	})
 }
 
 func (e *eulang) compileBinaryOpIntoEasm(easm *easm, binOp binaryOp) eulType {
@@ -396,6 +408,35 @@ func (e *eulang) compileVarReadIntoEasm(easm *easm, expr varRead) eulType {
 	})
 
 	return cvar.etype
+}
+
+func (e *eulang) compileMapReadIntoEasm(easm *easm, expr mapRead) eulType {
+	// TODO for now all maps are in global scope
+	mread, ok := e.maps[expr.name]
+	if !ok {
+		log.Fatalf("%s:%d:%d ERROR map read from undefined map '%s' ",
+			expr.loc.filepath, expr.loc.row, expr.loc.col, expr.name)
+	}
+
+	mapprefix := strToWords(fmt.Sprint(mread.name, "."))
+	if len(mapprefix) > 1 {
+		log.Fatalf("%s:%d:%d ERROR map '%s' name is too long",
+			expr.loc.filepath, expr.loc.row, expr.loc.col, expr.name)
+	}
+
+	compiledKey := e.compileExprIntoEasm(easm, expr.key)
+	if compiledKey.typee != mread.keyType {
+		log.Fatalf("%s:%d:%d ERROR map read from map key type missmatched. expected '%s', but got '%s' ",
+			expr.loc.filepath, expr.loc.row, expr.loc.col, eulTypes[mread.keyType], eulTypes[compiledKey.typee])
+	}
+
+	//TODO for now map read available only for fixed types
+	easm.pushInstruction(eulvm.Instruction{
+		OpCode:  eulvm.MAPVSSLOAD,
+		Operand: mapprefix[0],
+	})
+
+	return mread.valType
 }
 
 func (e *eulang) compileIfIntoEasm(easm *easm, eif eulIf) {
@@ -474,7 +515,7 @@ func (e *eulang) compileExprIntoEasm(easm *easm, expr eulExpr) compiledExpr {
 
 		//TODO strings dont have their own type. But for now they're just i64 pointers to memory
 		cExp.typee = eulTypei64
-	case eulExprKindByte32Lit:
+	case eulExprKindBytes32Lit:
 		w := new(uint256.Int)
 		w.SetBytes32(expr.as.bytes32Lit.Bytes())
 		easm.pushInstruction(eulvm.Instruction{
@@ -514,6 +555,8 @@ func (e *eulang) compileExprIntoEasm(easm *easm, expr eulExpr) compiledExpr {
 		cExp.typee = e.compileVarReadIntoEasm(easm, expr.as.varRead)
 	case eulExprKindBinaryOp:
 		cExp.typee = e.compileBinaryOpIntoEasm(easm, *expr.as.binaryOp)
+	case eulExprKindMapRead:
+		cExp.typee = e.compileMapReadIntoEasm(easm, *expr.as.mapRead)
 	default:
 		panic("unsupported expression kind")
 	}
