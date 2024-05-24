@@ -1,34 +1,34 @@
 // Demontrates func calls with arguments
-func test2(a: i64, b: i64) {
+func test2(a i64, b i64) {
 	while a < b {
-		a = a+2;
-		write("success t2\n");
+		a = a + 2
+		write("success t2\n")
 	}
 }
 
-func test(a: i64, b: i64) {
+func test(a i64, b i64) {
 	if a < b {
-		write("success t\n");
+		write("success t\n")
 	} else {
-		write("failed\n");
+		write("failed\n")
 	}
-	var c: i64;
-	var d: i64;
-	c = 17;
-	d = 10;
-	test2(d, c);
+	var c i64
+	var d i64
+	c = 17
+	d = 10
+	test2(d, c)
 }
 
 func entry() external {
-	var i: i64;
-	var j: i64;
-	i = 40;
-	j = 50;
+	var i i64
+	var j i64
+	i = 40
+	j = 50
 
-	test(i, j);
+	test(i, j)
 	
 	while i < j {
-		writef("passed %s %d\n", "test", i);
-		i = i + 3;
+		writef("passed %s %d\n", "test", i)
+		i = i + 3
 	}
 }
