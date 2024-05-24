@@ -21,6 +21,7 @@ const (
 	RET
 	CALL
 	CALLDATA
+	DATALOAD
 )
 
 // 0x10 range - comparison ops.
@@ -73,6 +74,7 @@ var OpCodesView = map[string]OpCode{
 	"DROP":       DROP,
 	"RET":        RET,
 	"CALLDATA":   CALLDATA,
+	"DATALOAD":   DATALOAD,
 	"SWAP":       SWAP,
 	"SUB":        SUB,
 	"NEQ":        NEQ,
@@ -105,6 +107,7 @@ var OpCodes = map[OpCode]string{
 	DROP:       "DROP",
 	CALL:       "CALL",
 	CALLDATA:   "CALLDATA",
+	DATALOAD:   "DATALOAD",
 	RET:        "RET",
 	SWAP:       "SWAP",
 	SUB:        "SUB",

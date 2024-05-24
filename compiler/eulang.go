@@ -3,6 +3,7 @@ package compiler
 import (
 	"fmt"
 	"log"
+	"strconv"
 
 	"github.com/Unheilbar/eulang/eulvm"
 	"github.com/ethereum/go-ethereum/common"
@@ -29,6 +30,7 @@ type compiledFunc struct {
 	name   string
 	params []eulFuncParam
 	//TODO later extend with arguments and return type info
+	modifier eulFuncModifier
 }
 
 type compiledExpr struct {
@@ -42,6 +44,7 @@ type varStorage uint8
 const (
 	storageKindStack      = iota // offset from the stack frame
 	storageKindStatic            // absolute address of the variable in static memory
+	storageKindCalldata          // absolute address of the variable in user input (dynamic types are not supported yet)
 	storageKindVersion           // address of the variable in merklelized persistent KV
 	storageKindPersistent        // address of the variable in not merkilized persistent KV
 )
@@ -53,7 +56,7 @@ type compiledVar struct {
 
 	// indicates where is the location of the variable
 	storage varStorage
-	addr    uint256.Int // interpretation based on storageKind
+	addr    *uint256.Int // interpretation based on storageKind
 }
 
 type eulScope struct {
@@ -155,7 +158,7 @@ func (e *eulang) compileVarDefIntoEasm(easm *easm, vd eulVarDef, storage varStor
 
 func (e *eulang) compileVarIntoEasm(easm *easm, vd eulVarDef, storage varStorage) compiledVar {
 	var cv compiledVar
-
+	cv.addr = new(uint256.Int)
 	if vd.etype == eulTypeVoid {
 		log.Fatalf("%s:%d:%d ERROR define variable with type void is not allowed (maybe in the future) ",
 			vd.loc.filepath, vd.loc.row, vd.loc.col)
@@ -176,10 +179,12 @@ func (e *eulang) compileVarIntoEasm(easm *easm, vd eulVarDef, storage varStorage
 
 	switch storage {
 	case storageKindStatic:
-		cv.addr = easm.pushByteArrToMemory([]byte{0})
+		*cv.addr = easm.pushByteArrToMemory([]byte{0})
 	case storageKindStack:
 		e.frameSize += 32 // all var have the size of 1 machine word
-		cv.addr = *uint256.NewInt(e.frameSize)
+		*cv.addr = *uint256.NewInt(e.frameSize)
+	case storageKindCalldata:
+		// for calldata address gets calculated in parent call
 	default:
 		panic("other storage kinds are not implemented yet")
 	}
@@ -194,36 +199,19 @@ func (e *eulang) compileFuncDefIntoEasm(easm *easm, fd eulFuncDef) {
 		log.Fatalf("%s:%d:%d ERROR double declaration. func '%s' was already defined",
 			fd.loc.filepath, fd.loc.row, fd.loc.col, fd.name)
 	}
-
 	f.addr = easm.program.Size()
 	f.name = fd.name
 	f.loc = fd.loc
 	f.params = fd.params
 	e.funcs[f.name] = f
+	f.modifier = fd.modifier
 	e.pushNewScope()
 
 	// compile func params
-	{
-		for _, param := range fd.params {
-			var vd eulVarDef
-			vd.name = param.name
-			vd.loc = param.loc
-			vd.etype = param.typee
-
-			varr := e.compileVarIntoEasm(easm, vd, storageKindStack)
-			easm.pushInstruction(eulvm.Instruction{
-				OpCode:  eulvm.SWAP,
-				Operand: *uint256.NewInt(1),
-			})
-			e.compileGetVarAddr(easm, &varr)
-			easm.pushInstruction(eulvm.Instruction{
-				OpCode:  eulvm.SWAP,
-				Operand: *uint256.NewInt(1),
-			})
-			easm.PushInstruction(eulvm.Instruction{
-				OpCode: eulvm.MSTORE256,
-			})
-		}
+	if fd.modifier == eulModifierKindExternal && len(fd.params) != 0 {
+		e.compileExternalFuncParams(easm, fd.params)
+	} else {
+		e.compileInternalFuncParams(easm, fd.params)
 	}
 
 	e.compileBlockIntoEasm(easm, &fd.body)
@@ -237,6 +225,47 @@ func (e *eulang) compileFuncDefIntoEasm(easm *easm, fd eulFuncDef) {
 		easm.pushInstruction(eulvm.Instruction{
 			OpCode: eulvm.STOP},
 		)
+	}
+}
+
+func (e *eulang) compileExternalFuncParams(easm *easm, params []eulFuncParam) {
+	// TODO for now each param has fixed size 32 bytes
+	baseOffset := eulvm.WordLength.Clone() // first 32 bytes determine called method
+	startAddress := baseOffset.Clone()
+	for _, param := range params {
+		var vd eulVarDef
+		vd.name = param.name
+		vd.loc = param.loc
+		vd.etype = param.typee
+
+		varr := e.compileVarIntoEasm(easm, vd, storageKindCalldata)
+		*varr.addr = *startAddress
+		startAddress.Add(startAddress, baseOffset.Clone())
+		e.compileGetVarAddr(easm, &varr)
+	}
+}
+
+func (e *eulang) compileInternalFuncParams(easm *easm, params []eulFuncParam) {
+	for _, param := range params {
+		var vd eulVarDef
+		vd.name = param.name
+		vd.loc = param.loc
+		vd.etype = param.typee
+
+		varr := e.compileVarIntoEasm(easm, vd, storageKindStack)
+		easm.pushInstruction(eulvm.Instruction{
+			OpCode:  eulvm.SWAP,
+			Operand: *uint256.NewInt(1),
+		})
+
+		e.compileGetVarAddr(easm, &varr)
+		easm.pushInstruction(eulvm.Instruction{
+			OpCode:  eulvm.SWAP,
+			Operand: *uint256.NewInt(1),
+		})
+		easm.PushInstruction(eulvm.Instruction{
+			OpCode: eulvm.MSTORE256,
+		})
 	}
 }
 
@@ -403,9 +432,20 @@ func (e *eulang) compileVarReadIntoEasm(easm *easm, expr varRead) eulType {
 	e.compileGetVarAddr(easm, cvar)
 
 	//TODO var reads and var write should be depending on type and storage
-	easm.pushInstruction(eulvm.Instruction{
-		OpCode: eulvm.MLOAD,
-	})
+	switch cvar.storage {
+	case storageKindStack:
+		easm.pushInstruction(eulvm.Instruction{
+			OpCode: eulvm.MLOAD,
+		})
+	case storageKindStatic:
+		easm.pushInstruction(eulvm.Instruction{
+			OpCode: eulvm.MLOAD,
+		})
+	case storageKindCalldata:
+		easm.pushInstruction(eulvm.Instruction{
+			OpCode: eulvm.DATALOAD,
+		})
+	}
 
 	return cvar.etype
 }
@@ -591,6 +631,10 @@ func (e *eulang) compileFuncCallIntoEasm(easm *easm, funcCall eulFuncCall) {
 	if !ok {
 		panic(fmt.Sprintf("undefined compiled function %s", funcCall.name))
 	}
+	if compiledFunc.modifier == eulModifierKindExternal {
+		log.Fatalf("%s:%d:%d ERROR calling func with external modifier is forbidden",
+			funcCall.loc.filepath, funcCall.loc.row, funcCall.loc.col)
+	}
 
 	//compile args
 	{
@@ -734,16 +778,21 @@ func (e *eulang) compileGetVarAddr(easm *easm, cv *compiledVar) {
 	case storageKindStatic:
 		easm.pushInstruction(eulvm.Instruction{
 			OpCode:  eulvm.PUSH,
-			Operand: cv.addr,
+			Operand: *cv.addr,
 		})
 	case storageKindStack:
 		e.compileReadFrameAddr(easm)
 		easm.pushInstruction(eulvm.Instruction{
 			OpCode:  eulvm.PUSH,
-			Operand: cv.addr,
+			Operand: *cv.addr,
 		})
 		easm.pushInstruction(eulvm.Instruction{
 			OpCode: eulvm.SUB,
+		})
+	case storageKindCalldata:
+		easm.pushInstruction(eulvm.Instruction{
+			OpCode:  eulvm.PUSH,
+			Operand: *cv.addr,
 		})
 	default:
 		panic("compiling other storage types is not implemented yet")
@@ -760,7 +809,54 @@ func (e *eulang) prepareVarStack(easm *easm, stackSize uint) {
 }
 
 // // TODO euler later can add here function arguments
-func (e *eulang) GenerateInput(method string) []byte {
+func (e *eulang) GenerateInput(method string, args []string) []byte {
+	var input []byte
 	meth := uint256.NewInt(uint64(e.funcs[method].addr)).Bytes32()
-	return meth[:]
+	input = append(input, meth[:]...)
+	params := e.funcs[method].params
+	if len(params) != len(args) {
+		log.Fatalf("params and args amount doesn't match. Got '%d' want '%d'", len(args), len(params))
+	}
+	for i, param := range params {
+		switch param.typee {
+		case eulTypei64:
+			argi64, err := strconv.Atoi(args[i])
+			if err != nil {
+				log.Fatalf("param arg types doesn't match. Cant convert '%v' to int", args[i])
+			}
+			arg := uint256.NewInt(uint64(argi64)).Bytes32()
+			input = append(input, arg[:]...)
+		case eulTypeBool:
+			var arg [32]byte
+			if args[i] == "true" {
+				arg = uint256.NewInt(uint64(1)).Bytes32()
+
+			} else if args[i] == "false" {
+				arg = uint256.NewInt(uint64(0)).Bytes32()
+			}
+
+			input = append(input, arg[:]...)
+		case eulTypeBytes32:
+			harg := common.HexToHash(args[i])
+			if harg.Hex() != args[i] {
+				log.Fatalf("param arg types doesn't match. Cant convert '%v' to bytes32", args[i])
+			}
+			input = append(input, harg.Bytes()...)
+		case eulTypeAddress:
+			if !common.IsHexAddress(args[i]) {
+				log.Fatalf("param arg types doesn't match. Cant convert '%v' to address", args[i])
+			}
+			harg := common.HexToAddress(args[i])
+			arg := new(uint256.Int).SetBytes(harg.Bytes()).Bytes32()
+
+			input = append(input, arg[:]...)
+		default:
+			panic("unrecognized eulang type in function call ")
+			//eulTypeVoid
+			//eulTypeBytes32
+			//eulTypeAddress
+		}
+
+	}
+	return input[:]
 }
