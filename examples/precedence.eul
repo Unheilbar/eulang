@@ -64,14 +64,12 @@ func testAddress(a address, b address, c address){
 }
 
 func test(a i64, b i64) {
-	var val1 i64
-	var val2 i64
-	val1 = 17
-	val2 = 10
+	var val1 i64 = 17
+	var val2 i64 = 10
 
 	testPrecedence(val2, val1)
 	
-	var bvar1 bytes32
+	var bvar1 bytes32 = "0xa080337ae51c4e064c189e113edd0ba391df9206e2f49db658bb32cf2911731b"
 	var bvar2 bytes32
 	var bvar3 bytes32
 
@@ -90,6 +88,7 @@ func test(a i64, b i64) {
 	avar3 = "0x0000000000000000000000000000000000000000"
 
 	testAddress(avar1, avar2, avar3)
+	writef("new zhopa %d: /n", val1)
 }
 
 func entry() external {
