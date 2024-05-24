@@ -1,6 +1,6 @@
-func test(a: address, b: bytes32) internal {
+func test(a address, b bytes32) internal {
 	// NOTE formatting prints accept %x for address %s for string literal %d for decimals %x for address
-	writef("hash: %v, address: %x", b, a);
+	writef("hash: %v, address: %x", b, a)
 	if b == b {
 
 	}
@@ -10,10 +10,10 @@ func test(a: address, b: bytes32) internal {
 }
 
 func entry() external {
-	var b: bytes32;
-	var a: address;
-	b = "0xa080337ae51c4e064c189e113edd0ba391df9206e2f49db658bb32cf2911730b";
-	a = "0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed";
-	test(a, b);
+	var b bytes32
+	var a address
+	b = "0xa080337ae51c4e064c189e113edd0ba391df9206e2f49db658bb32cf2911730b"
+	a = "0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed"
+	test(a, b)
 }
 

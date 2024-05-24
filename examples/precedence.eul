@@ -1,99 +1,103 @@
 // Demontrates func calls with arguments
-func testPrecedence(a: i64, b: i64) {
+func testPrecedence(a i64, b i64) { 
 	if 1 != 2 {
-		write("sucess not equal binary\n");
+		write("sucess not equal binary\n")
 	}  else {
-		write("FAIL\n");
+		write("FAIL\n")
 	} 
 	if 1 == 1 {
-		write("success equal\n");
+		write("success equal\n")
 	} else {
-		write("FAIL\n");
+		write("FAIL\n")
 	} 
 	if a < b {
-		write("success less\n");
+		write("success less\n")
 	} else {
-		write("FAIL\n");
+		write("FAIL\n")
 	} 
 	if b > a {
-		write("success greater\n");
+		write("success greater\n")
 	} else {
-		write("FAIL\n");
+		write("FAIL\n")
 	} 
 	if b - a == 7 {
-		write("success sub\n");
+		write("success sub\n")
 	} else {
-		write("FAIL\n");
+		write("FAIL\n")
 	} 	 
 }
 
-func testBytes(a: bytes32, b: bytes32, c: bytes32) {
+func testBytes(a bytes32, b bytes32, c bytes32) {
 	if a == b {
-		write("success bytes eq\n");
+		write("success bytes eq\n")
 	} else {
-		write("FAIL\n");
+		write("FAIL\n")
 	}
 	if a != c{
-		write("success bytes not eq\n");
+		write("success bytes not eq\n")
 	} else {
-		write("FAIL\n");
+		write("FAIL\n")
 	}
 }
 
-func testAddress(a: address, b: address, c: address){
+func testAddress(a address, b address, c address){
 	if a == b {
-		write("success address eq\n");
+		write("success address eq\n")
 	} else {
-		write("FAIL\n");
+		write("FAIL\n")
 	}
 	if a == b && b != c {
-		write("success and\n");
+		write("success and\n")
 	} else {
-		write("FAIL\n");
+		write("FAIL\n")
 	}
 	if a != b || a == b {
-		write("success or\n");
+		write("success or\n")
 	} else {
-		write("FAIL\n");
+		write("FAIL\n")
 	}
 	if a != c{
-		write("success address not eq\n");
+		write("success address not eq\n")
 	} else {
-		write("FAIL\n");
+		write("FAIL\n")
 	}
 }
 
-func test(a: i64, b: i64) {
-	var val1: i64;
-	var val2: i64;
-	val1 = 17;
-	val2 = 10;
+func test(a i64, b i64) {
+	var val1 i64
+	var val2 i64
+	val1 = 17
+	val2 = 10
 
-	testPrecedence(val2, val1);
+	testPrecedence(val2, val1)
 	
-	var bvar1: bytes32;
-	var bvar2: bytes32;
-	var bvar3: bytes32;
-	bvar1 = "0xa080337ae51c4e064c189e113edd0ba391df9206e2f49db658bb32cf2911730b";
-	bvar2 = "0xa080337ae51c4e064c189e113edd0ba391df9206e2f49db658bb32cf2911730b";
-	bvar3 = "0xa010101010101010101010101010101010101010101010101010010101010101";
-	testBytes(bvar1, bvar2, bvar3);
+	var bvar1 bytes32
+	var bvar2 bytes32
+	var bvar3 bytes32
 
-	var avar1: address;
-	var avar2: address;
-	var avar3: address;
-	avar1 = "0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed";
-	avar2 = "0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed";
-	avar3 = "0x0000000000000000000000000000000000000000";
-	testAddress(avar1, avar2, avar3);
+	bvar1 = "0xa080337ae51c4e064c189e113edd0ba391df9206e2f49db658bb32cf2911730b"
+	bvar2 = "0xa080337ae51c4e064c189e113edd0ba391df9206e2f49db658bb32cf2911730b"
+	bvar3 = "0xa010101010101010101010101010101010101010101010101010010101010101"
+
+	testBytes(bvar1, bvar2, bvar3)
+
+	var avar1 address   
+	var avar2 address
+	var avar3 address
+
+	avar1 = "0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed"
+	avar2 = "0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed"
+	avar3 = "0x0000000000000000000000000000000000000000"
+
+	testAddress(avar1, avar2, avar3)
 }
 
 func entry() external {
-	var i: i64;
-	var j: i64;
-	i = 40;
-	j = 50;
+	var i i64
+	var j i64 
+	i = 40
+	j = 50
 
-	test(i, j);
-	write("PASSED\n");
+	test(i, j)
+	write("PASSED\n")
 }

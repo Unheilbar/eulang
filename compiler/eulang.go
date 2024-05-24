@@ -589,8 +589,7 @@ func (e *eulang) compileExprIntoEasm(easm *easm, expr eulExpr) compiledExpr {
 			})
 		}
 
-		//TODO booleans have no their own type just yet, but they are saved as i64 words on stack
-		cExp.typee = eulTypei64
+		cExp.typee = eulTypeBool
 	case eulExprKindVarRead:
 		cExp.typee = e.compileVarReadIntoEasm(easm, expr.as.varRead)
 	case eulExprKindBinaryOp:

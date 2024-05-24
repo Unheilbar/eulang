@@ -1,9 +1,9 @@
-func cool(i: i64) {
-	if i>10 {
-		write("cool\n");
+func cool(i i64) {
+	if i > 10 {
+		write("cool\n")
 	}
 }
 
-func entry() {
-	cool(20);
+func entry() external {
+	cool(20)
 }
