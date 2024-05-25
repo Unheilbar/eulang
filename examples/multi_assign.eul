@@ -1,0 +1,9 @@
+func entry() external {
+	var a i64
+	var b i64
+	a = 5
+	b = 10
+	writef("%d, %d \n", a, b)
+	//a, b = 10, 20
+	//a, b = func()
+}

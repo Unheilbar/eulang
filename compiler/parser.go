@@ -1,6 +1,7 @@
 package compiler
 
 import (
+	"fmt"
 	"log"
 	"strconv"
 
@@ -75,18 +76,20 @@ const (
 	eulStmtKindExpr eulStmtKind = iota
 	eulStmtKindIf
 	eulStmtKindVarAssign
+	eulStmtKindMultiVarAssign
 	eulStmtKindMapWrite
 	eulStmtKindWhile
 	eulStmtKindVarDef
 )
 
 type eulStatementAs struct {
-	expr      eulExpr
-	eif       eulIf
-	varAssign eulVarAssign
-	mapWrite  eulMapWrite
-	while     eulWhile
-	vardef    eulVarDef
+	expr        eulExpr
+	eif         eulIf
+	varAssign   eulVarAssign
+	multiAssign eulMultiAssign
+	mapWrite    eulMapWrite
+	while       eulWhile
+	vardef      eulVarDef
 }
 
 type eulStatement struct {
@@ -158,6 +161,12 @@ type eulVarAssign struct {
 	name  string
 	value eulExpr
 	loc   eulLoc
+}
+
+type eulMultiAssign struct {
+	names  []string
+	values []eulExpr
+	loc    eulLoc
 }
 
 type eulMapWrite struct {
@@ -507,6 +516,13 @@ func parseEulStmt(lex *lexer) eulStatement {
 				stmt.kind = eulStmtKindVarAssign
 
 				stmt.as.varAssign = parseVarAssign(lex)
+				fmt.Println("here")
+				return stmt
+			} else if nt.kind == eulTokenKindComma {
+				var stmt eulStatement
+				stmt.kind = eulStmtKindMultiVarAssign
+
+				stmt.as.multiAssign = parseMultiAssign(lex)
 				return stmt
 			} else if nt.kind == eulTokenKindOpenBrack {
 				var stmt eulStatement
@@ -518,7 +534,7 @@ func parseEulStmt(lex *lexer) eulStatement {
 		}
 	}
 
-	// if it's still there then just parse it as a statement
+	// if it's still there then just parse it as a statement-expession
 	var stmt eulStatement
 	stmt.kind = eulStmtKindExpr
 	stmt.as.expr = parseEulExpr(lex)
@@ -549,6 +565,34 @@ func parseVarAssign(lex *lexer) eulVarAssign {
 	vas.value = parseEulExpr(lex)
 	vas.loc = t.loc
 	return vas
+}
+
+func parseMultiAssign(lex *lexer) eulMultiAssign {
+	var t, nt token
+	var result eulMultiAssign
+	// Parse left part of assignment
+	{
+		for lex.peek(&t, 0) && lex.peek(&nt, 1) &&
+			t.kind == eulTokenKindName &&
+			nt.kind != eulTokenKindEq {
+			result.names = append(result.names, lex.expectToken(eulTokenKindName).view)
+			lex.expectToken(eulTokenKindComma)
+		}
+	}
+	result.names = append(result.names, lex.expectToken(eulTokenKindName).view)
+	lex.expectToken(eulTokenKindEq)
+
+	// parse right part of assignment
+	{
+		for {
+			result.values = append(result.values, parseEulExpr(lex))
+			if lex.peek(&t, 0) && t.kind != eulTokenKindComma {
+				break
+			}
+		}
+	}
+
+	return result
 }
 
 func parseMapWrite(lex *lexer) eulMapWrite {
@@ -620,6 +664,9 @@ func parsePrimaryExpr(lex *lexer) eulExpr {
 		lex.next(&t)
 		expr = parseEulExpr(lex)
 		lex.expectToken(eulTokenKindCloseParen)
+
+	//case eulTokenKindComma:
+	//	lex.expectToken(eulTokenKindComma)
 	default:
 		log.Fatalf("%s:%d:%d no primary expression starts with %s",
 			lex.filepath, lex.row, lex.lineStart, t.view)

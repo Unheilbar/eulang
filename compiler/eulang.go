@@ -283,6 +283,8 @@ func (e *eulang) compileStatementIntoEasm(easm *easm, stmt eulStatement) {
 		e.compileIfIntoEasm(easm, stmt.as.eif)
 	case eulStmtKindVarAssign:
 		e.compileVarAssignIntoEasm(easm, stmt.as.varAssign)
+	case eulStmtKindMultiVarAssign:
+		e.compileMultiVarAssignIntoEasm(easm, stmt.as.multiAssign)
 	case eulStmtKindWhile:
 		e.compileWhileIntoEasm(easm, stmt.as.while)
 	case eulStmtKindVarDef:
@@ -322,6 +324,10 @@ func (e *eulang) compileWhileIntoEasm(easm *easm, w eulWhile) {
 
 	// resolve deferred
 	easm.program.Instrutions[jumpWhileAddr].Operand = *uint256.NewInt(uint64(bodyEnd))
+}
+
+func (e *eulang) compileMultiVarAssignIntoEasm(easm *easm, expr eulMultiAssign) {
+	//TODO implement later
 }
 
 func (e *eulang) compileVarAssignIntoEasm(easm *easm, expr eulVarAssign) {
