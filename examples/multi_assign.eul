@@ -1,0 +1,27 @@
+
+
+
+func entry() external {
+	var a i64
+	var b i64
+	a, b = 10+16, 21+23
+
+	if a == 26 && b == 44 {
+		write("PASS\n")
+	} else {
+		write("FAIL\n")
+	}
+
+	var c i64
+	var d i64
+	var q i64
+	c = 20
+	d = 50
+	a, b, q = c+c*d, d+c, d-c
+	
+	if a == 1020 && b == 70 && q == 30{
+		write("PASS\n")
+	} else {
+		write("FAIL\n")
+	}
+}

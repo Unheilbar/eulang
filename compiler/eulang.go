@@ -89,7 +89,7 @@ var binaryOpByType = map[eulType]map[eulBinaryOpKind]compileOp{
 		binaryOpKindNotEqual: {eulvm.Instruction{OpCode: eulvm.NEQ}, eulTypeBool},
 		binaryOpKindLess:     {eulvm.Instruction{OpCode: eulvm.LT}, eulTypeBool},
 		binaryOpKindGreater:  {eulvm.Instruction{OpCode: eulvm.GT}, eulTypeBool},
-		binaryOpKindMulti:    {},
+		binaryOpKindMulti:    {eulvm.Instruction{OpCode: eulvm.MUL}, eulTypei64},
 		binaryOpKindPlus:     {eulvm.Instruction{OpCode: eulvm.ADD}, eulTypei64},
 		binaryOpKindMinus:    {eulvm.Instruction{OpCode: eulvm.SUB}, eulTypei64},
 	},
@@ -283,6 +283,8 @@ func (e *eulang) compileStatementIntoEasm(easm *easm, stmt eulStatement) {
 		e.compileIfIntoEasm(easm, stmt.as.eif)
 	case eulStmtKindVarAssign:
 		e.compileVarAssignIntoEasm(easm, stmt.as.varAssign)
+	case eulStmtKindMultiVarAssign:
+		e.compileMultiVarAssignIntoEasm(easm, stmt.as.multiAssign)
 	case eulStmtKindWhile:
 		e.compileWhileIntoEasm(easm, stmt.as.while)
 	case eulStmtKindVarDef:
@@ -322,6 +324,22 @@ func (e *eulang) compileWhileIntoEasm(easm *easm, w eulWhile) {
 
 	// resolve deferred
 	easm.program.Instrutions[jumpWhileAddr].Operand = *uint256.NewInt(uint64(bodyEnd))
+}
+
+func (e *eulang) compileMultiVarAssignIntoEasm(easm *easm, multiexp eulMultiAssign) {
+	//TODO for now supports only obvious case like a, b = c, d
+	if len(multiexp.names) != len(multiexp.values) {
+		log.Fatalf("%s:%d:%d ERROR assignment missmatch got '%d' variables but '%d' values",
+			multiexp.loc.filepath, multiexp.loc.row, multiexp.loc.col, len(multiexp.names), len(multiexp.values))
+	}
+
+	for i, name := range multiexp.names {
+		e.compileVarAssignIntoEasm(easm, eulVarAssign{
+			name:  name,
+			value: multiexp.values[i],
+			loc:   multiexp.loc,
+		})
+	}
 }
 
 func (e *eulang) compileVarAssignIntoEasm(easm *easm, expr eulVarAssign) {
