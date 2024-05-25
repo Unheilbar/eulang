@@ -26,8 +26,7 @@ run-examples:
 
 
 run-bench:
-	go run cmd/benches/bench.go
-
+	go test -v cmd/benches/*.go -bench=. -benchtime=10s -benchmem
 
 test-compiler:
 	go test -v compiler/*

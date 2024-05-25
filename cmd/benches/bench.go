@@ -20,19 +20,19 @@ type benchSuit struct {
 	wallet2 common.Hash
 
 	transferCall []byte
-	checkCall    []byte
+
+	check func(expected int)
 }
 
-const emissionAmount = 1000000
+const emissionAmount = 1000000000
 const transferAmount = 1
 
 func prepareBench() *benchSuit {
-	file := "/home/allison/src/eulang/examples/demo_transfer.eul"
+	file := "./testdata/demo_transfer.eul"
 	eulang := compiler.NewEulang()
 	prog := compiler.CompileFromSource(eulang, file)
 	//e := eulvm.New(prog).WithDebug()
 	e := eulvm.New(prog)
-
 	var bs = &benchSuit{}
 
 	bs.vm = e
@@ -49,7 +49,12 @@ func prepareBench() *benchSuit {
 	e.Reset()
 
 	bs.transferCall = eulang.GenerateInput("transfer", []string{bs.wallet1.Hex(), bs.wallet2.Hex(), fmt.Sprint(transferAmount)})
-	bs.checkCall = eulang.GenerateInput("checkBalance", []string{bs.wallet2.Hex(), fmt.Sprint(1)})
+
+	bs.check = func(expected int) {
+		check := eulang.GenerateInput("checkBalance", []string{bs.wallet2.Hex(), fmt.Sprint(expected)})
+		bs.vm.Run(check)
+		bs.vm.Reset()
+	}
 
 	return bs
 }
