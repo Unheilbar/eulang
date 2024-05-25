@@ -6,11 +6,13 @@ import (
 	"github.com/holiman/uint256"
 )
 
-const MemoryCapacity = 100 * 1024 // memory limit to avoid extra allocations during execution
+const MemoryCapacity = 10 * 1024 // memory limit to avoid extra allocations during execution
 
 type Memory struct {
-	store [MemoryCapacity]byte //
-	size  uint64
+	store [MemoryCapacity]byte // store that used in runtime
+
+	freshStore [MemoryCapacity]byte // store that used in reset
+	size       uint64
 }
 
 func NewMemory() *Memory {
@@ -19,7 +21,10 @@ func NewMemory() *Memory {
 
 func NewMemoryWithPrealloc(prealloc []byte) *Memory {
 	m := &Memory{}
+
 	copy(m.store[:], prealloc)
+	copy(m.freshStore[:], prealloc)
+
 	m.size = uint64(len(prealloc))
 	return m
 }
@@ -67,6 +72,10 @@ func (m *Memory) Store() []byte {
 	res := make([]byte, m.size)
 	copy(res[:], m.store[:m.size])
 	return res
+}
+
+func (m *Memory) reset() {
+	copy(m.store[:], m.freshStore[:])
 }
 
 func (m *Memory) Dump() {
