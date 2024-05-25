@@ -1,7 +1,6 @@
 package compiler
 
 import (
-	"fmt"
 	"log"
 	"strconv"
 
@@ -39,7 +38,8 @@ type eulIf struct {
 type eulExprKind uint8
 
 const (
-	eulExprKindStrLit eulExprKind = iota
+	eulExprKindNone eulExprKind = iota
+	eulExprKindStrLit
 	eulExprKindBytes32Lit
 	eulExprKindAddressLit
 	eulExprKindBoolLit
@@ -516,7 +516,6 @@ func parseEulStmt(lex *lexer) eulStatement {
 				stmt.kind = eulStmtKindVarAssign
 
 				stmt.as.varAssign = parseVarAssign(lex)
-				fmt.Println("here")
 				return stmt
 			} else if nt.kind == eulTokenKindComma {
 				var stmt eulStatement
@@ -585,10 +584,14 @@ func parseMultiAssign(lex *lexer) eulMultiAssign {
 	// parse right part of assignment
 	{
 		for {
-			result.values = append(result.values, parseEulExpr(lex))
+			expr := parseEulExpr(lex)
+			if expr.kind != eulExprKindNone {
+				result.values = append(result.values, expr)
+			}
 			if lex.peek(&t, 0) && t.kind != eulTokenKindComma {
 				break
 			}
+			lex.expectToken(eulTokenKindComma)
 		}
 	}
 
@@ -664,9 +667,6 @@ func parsePrimaryExpr(lex *lexer) eulExpr {
 		lex.next(&t)
 		expr = parseEulExpr(lex)
 		lex.expectToken(eulTokenKindCloseParen)
-
-	//case eulTokenKindComma:
-	//	lex.expectToken(eulTokenKindComma)
 	default:
 		log.Fatalf("%s:%d:%d no primary expression starts with %s",
 			lex.filepath, lex.row, lex.lineStart, t.view)
@@ -677,12 +677,15 @@ func parsePrimaryExpr(lex *lexer) eulExpr {
 }
 
 func parseEulExprWithPrecedence(lex *lexer, prec eulBinaryOpPrecedence) eulExpr {
-	if prec >= eulCountBinaryOpPrecedence {
+	var t token
+	if prec >= eulCountBinaryOpPrecedence && lex.peek(&t, 0) && t.kind != eulTokenKindComma {
 		return parsePrimaryExpr(lex)
+	}
+	if t.kind == eulTokenKindComma {
+		return eulExpr{}
 	}
 
 	lhs := parseEulExprWithPrecedence(lex, prec+1)
-	var t token
 	var def binaryOpDef
 	for lex.peek(&t, 0) && binDefByToken(t, &def) && def.prec == prec {
 		ok := lex.next(&t)
