@@ -1,0 +1,21 @@
+// Demo ERC20 type transfer in eulang
+// Use for benchmarks
+
+map balances[bytes32] i64
+
+func transfer(from bytes32, to bytes32, amount i64) external {
+	balances[from] = balances[from] - amount
+	balances[to] = balances[to] + amount
+}
+
+func emission(to bytes32, amount i64) external {
+	balances[to] = amount
+}
+
+func checkBalance(wallet bytes32, expected i64) external {
+	if balances[wallet] != expected {
+		writef("FAIL wallet_id: %v expected: %d actual: %d \n", wallet, expected, balances[wallet])
+	} else {
+		write("pass\n")
+	}
+}

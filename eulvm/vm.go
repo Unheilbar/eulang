@@ -51,7 +51,7 @@ func New(prog Program) *EulVM {
 	return &EulVM{
 		program: prog.Instrutions,
 		memory:  m,
-		state:   make(map[common.Hash]common.Hash),
+		state:   make(map[common.Hash]common.Hash, 10),
 		hasher:  sha3.NewLegacyKeccak256().(keccakState),
 	}
 }
@@ -230,9 +230,11 @@ exec:
 		return nil
 	case MAPVSSTORE:
 		val := e.stack[e.stackSize]
-		key := e.stack[e.stackSize-1].Bytes()
-		copy(e.mapKeyBuffer[:32], key)
-		copy(e.mapKeyBuffer[32:], inst.Operand.Bytes())
+		key := e.stack[e.stackSize-1].Bytes32()
+		mmapkey := inst.Operand.Bytes32()
+
+		copy(e.mapKeyBuffer[:32], key[:])
+		copy(e.mapKeyBuffer[32:], mmapkey[:])
 
 		e.hasher.Reset()
 		e.hasher.Write(e.mapKeyBuffer[:])
@@ -244,9 +246,10 @@ exec:
 		e.ip++
 		return nil
 	case MAPVSSLOAD:
-		key := e.stack[e.stackSize].Bytes()
-		copy(e.mapKeyBuffer[:32], key)
-		copy(e.mapKeyBuffer[32:], inst.Operand.Bytes())
+		key := e.stack[e.stackSize].Bytes32()
+		val := inst.Operand.Bytes32()
+		copy(e.mapKeyBuffer[:32], key[:])
+		copy(e.mapKeyBuffer[32:], val[:])
 
 		e.hasher.Reset()
 		e.hasher.Write(e.mapKeyBuffer[:])
@@ -356,6 +359,7 @@ exec:
 func (e *EulVM) Reset() {
 	e.ip = 0
 	e.stackSize = 0
+	e.memory.reset()
 }
 
 func (e *EulVM) Dump() {
@@ -365,6 +369,10 @@ func (e *EulVM) Dump() {
 		fmt.Println(e.stack[i])
 	}
 	fmt.Println("-----dump-----")
+}
+
+func (e *EulVM) MemDump() {
+	e.memory.Dump()
 }
 
 // euler native functions
