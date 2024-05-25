@@ -156,6 +156,14 @@ exec:
 		e.stackSize--
 		e.ip++
 		return nil
+	case MUL:
+		e.stack[e.stackSize-1].Mul(
+			&(e.stack[e.stackSize]),
+			&(e.stack[e.stackSize-1]),
+		)
+		e.stackSize--
+		e.ip++
+		return nil
 	case EQ:
 		//
 		if e.stack[e.stackSize].Eq(&e.stack[e.stackSize-1]) {

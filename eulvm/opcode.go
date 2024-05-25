@@ -7,6 +7,7 @@ const (
 	STOP OpCode = iota
 	ADD
 	SUB
+	MUL
 	POP
 	PUSH
 	SWAP
@@ -84,6 +85,7 @@ var OpCodesView = map[string]OpCode{
 	"VSLOAD":     VSLOAD,
 	"MAPVSSTORE": MAPVSSTORE,
 	"MAPVSSLOAD": MAPVSSLOAD,
+	"MUL":        MUL,
 }
 
 var OpCodes = map[OpCode]string{
@@ -119,6 +121,7 @@ var OpCodes = map[OpCode]string{
 	VSLOAD:     "VLOAD",
 	MAPVSSTORE: "MAPVSSTORE",
 	MAPVSSLOAD: "MAPVSSLOAD",
+	MUL:        "MUL",
 }
 
 func checkOpCodes() {}
