@@ -1,0 +1,57 @@
+func getABC(a i64, b i64) i64, i64, address {
+	var addr address
+	addr = "0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed"
+	if false {
+		return a, b, addr
+	} 
+
+	var ad address
+	ad = addr
+	var i i64
+	i = 0+3
+	return a, b, ad
+}
+
+func entry() external {
+	var a i64
+	var b i64
+	var addr address
+	a, b, addr = getABC(10, 20)
+	
+	var expAddr address
+	expAddr = "0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed"
+	if a == 10 {
+		write("pass\n")
+	} else {
+		write("FAIL\n")
+	}
+
+	if b == 20 {
+		write("pass\n")
+	} else {
+		write("FAIL\n")
+	}
+
+	if addr == expAddr {
+		write("pass\n")
+	} else {
+		write("FAIL\n")
+	}
+
+	a, b = b, a
+	if a == 20 {
+		write("pass\n")
+	} else {
+		write("FAIL\n")
+	}
+	
+	if b == 10 {
+		write("pass\n")
+	} else {
+		write("FAIL\n")
+	}
+
+	write("pass\n")
+}
+
+

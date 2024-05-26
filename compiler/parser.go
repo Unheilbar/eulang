@@ -70,11 +70,17 @@ type eulExpr struct {
 	as   eulExprAs
 }
 
+type eulReturn struct {
+	returnExprs []eulExpr
+	loc         eulLoc
+}
+
 type eulStmtKind uint8
 
 const (
 	eulStmtKindExpr eulStmtKind = iota
 	eulStmtKindIf
+	eulStmtKindReturn
 	eulStmtKindVarAssign
 	eulStmtKindMultiVarAssign
 	eulStmtKindMapWrite
@@ -85,6 +91,7 @@ const (
 type eulStatementAs struct {
 	expr        eulExpr
 	eif         eulIf
+	freturn     eulReturn
 	varAssign   eulVarAssign
 	multiAssign eulMultiAssign
 	mapWrite    eulMapWrite
@@ -113,9 +120,10 @@ type eulFuncDef struct {
 	name     string
 	modifier eulFuncModifier
 
-	body   eulBlock
-	loc    eulLoc
-	params []eulFuncParam
+	body    eulBlock
+	loc     eulLoc
+	params  []eulFuncParam
+	returns []eulType
 }
 
 type eulType uint8
@@ -406,20 +414,40 @@ func parseFuncDef(lex *lexer) eulFuncDef {
 		var t token
 		lex.peek(&t, 0)
 		if t.kind == eulTokenKindName {
-			t = lex.expectToken(eulTokenKindName)
 			switch t.view {
 			case "external":
+				t = lex.expectToken(eulTokenKindName)
 				f.modifier = eulModifierKindExternal
 			case "internal":
+				t = lex.expectToken(eulTokenKindName)
 				f.modifier = eulModifierKindInternal
 			default:
-				log.Fatalf("%s:%d:%d undefined modifier '%s'", t.loc.filepath, t.loc.row, t.loc.col, t.view)
+				// It's probably func return params. Parse it later
 			}
 		} else {
 			// NOTE default modifier is internal
 			f.modifier = eulModifierKindInternal
 		}
 	}
+
+	//If function has return params them parse it
+	{
+		var t token
+		for lex.peek(&t, 0) && t.kind == eulTokenKindName {
+			ttype, ok := eulTypesView[t.view]
+			if !ok {
+				log.Fatalf("%s:%d:%d unknown type '%s'", t.loc.filepath, t.loc.row, t.loc.col, t.view)
+			}
+
+			f.returns = append(f.returns, ttype)
+			lex.expectToken(eulTokenKindName)
+
+			if lex.peek(&t, 0) && t.kind == eulTokenKindComma {
+				lex.expectToken(eulTokenKindComma)
+			}
+		}
+	}
+
 	f.body = *parseCurlyEulBlock(lex)
 	return f
 }
@@ -442,6 +470,7 @@ func parseFuncDefParams(lex *lexer) []eulFuncParam {
 		}
 	}
 	lex.expectToken(eulTokenKindCloseParen)
+
 	return result
 }
 
@@ -509,6 +538,11 @@ func parseEulStmt(lex *lexer) eulStatement {
 			stmt.kind = eulStmtKindVarDef
 			stmt.as.vardef = parseVarDef(lex)
 			return stmt
+		case "return":
+			var stmt eulStatement
+			stmt.kind = eulStmtKindReturn
+			stmt.as.freturn = parseReturn(lex)
+			return stmt
 		default:
 			var nt token
 			if lex.peek(&nt, 1) && nt.kind == eulTokenKindEq {
@@ -563,7 +597,17 @@ func parseVarAssign(lex *lexer) eulVarAssign {
 	t := lex.expectToken(eulTokenKindEq)
 	vas.value = parseEulExpr(lex)
 	vas.loc = t.loc
+
 	return vas
+}
+
+func parseReturn(lex *lexer) eulReturn {
+	var ret eulReturn
+
+	ret.loc = lex.expectKeyword("return").loc
+	ret.returnExprs = parseMultiExpr(lex)
+
+	return ret
 }
 
 func parseMultiAssign(lex *lexer) eulMultiAssign {
@@ -581,12 +625,20 @@ func parseMultiAssign(lex *lexer) eulMultiAssign {
 	result.names = append(result.names, lex.expectToken(eulTokenKindName).view)
 	lex.expectToken(eulTokenKindEq)
 
-	// parse right part of assignment
+	result.values = parseMultiExpr(lex)
+
+	return result
+}
+
+func parseMultiExpr(lex *lexer) []eulExpr {
+	var res []eulExpr
+
 	{
+		var t token
 		for {
 			expr := parseEulExpr(lex)
 			if expr.kind != eulExprKindNone {
-				result.values = append(result.values, expr)
+				res = append(res, expr)
 			}
 			if lex.peek(&t, 0) && t.kind != eulTokenKindComma {
 				break
@@ -594,8 +646,7 @@ func parseMultiAssign(lex *lexer) eulMultiAssign {
 			lex.expectToken(eulTokenKindComma)
 		}
 	}
-
-	return result
+	return res
 }
 
 func parseMapWrite(lex *lexer) eulMapWrite {
