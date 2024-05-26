@@ -1,0 +1,35 @@
+
+//func ret(a i64,b i64) i64, i64, address {
+//	var addr address
+//	addr = "0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed"
+//	
+//	return b-a, a+b, addr
+//}
+//
+func getN(n i64) i64 {
+	return n
+}
+
+func getAB(a i64, b i64) i64, i64 {
+	return a, b
+}
+
+//
+//func testRet()  {
+//	var c i64
+//	var d i64
+//	c = 11
+//	d = 20
+//	writef("ret %d %d %x \n", ret(c, d))
+//}
+
+
+func entry() external {
+	var a i64
+	var b i64
+	a, b = getAB(10, 20)
+
+	writef("result %d %d \n", a, b)
+}
+
+

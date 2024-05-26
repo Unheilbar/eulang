@@ -25,17 +25,17 @@ type compiledMap struct {
 }
 
 type compiledFunc struct {
-	loc    eulLoc
-	addr   int
-	name   string
-	params []eulFuncParam
-	//TODO later extend with arguments and return type info
+	loc      eulLoc
+	addr     int
+	name     string
+	params   []eulFuncParam
+	returns  []eulType
 	modifier eulFuncModifier
 }
 
 type compiledExpr struct {
-	addr  int     // where it starts
-	typee eulType // the type that compiled expression returns
+	addr  int       // where it starts
+	types []eulType // the type that compiled expression returns
 	loc   eulLoc
 }
 
@@ -63,6 +63,7 @@ type eulScope struct {
 	parent *eulScope
 
 	compiledVars map[string]compiledVar
+	expReturn    []eulType
 }
 
 type compileOp struct {
@@ -153,7 +154,40 @@ func (e *eulang) compileVarDefIntoEasm(easm *easm, vd eulVarDef, storage varStor
 	if vd.hasInit {
 		panic("var initialization after declaration is not implemented yet")
 	}
+}
 
+func (e *eulang) compileReturnIntoEasm(easm *easm, ret eulReturn) {
+	// TODO currently doesn't support return for external functions
+
+	if len(ret.returnExprs) != len(e.scope.expReturn) {
+		log.Fatalf("%s:%d:%d ERROR expect return '%d' values but got '%d'",
+			ret.loc.filepath, ret.loc.row, ret.loc.col, len(ret.returnExprs), len(e.scope.expReturn))
+	}
+
+	for i := len(ret.returnExprs) - 1; i >= 0; i-- {
+		expr := ret.returnExprs[i]
+		expType := e.scope.expReturn[i]
+
+		cexp := e.compileExprIntoEasm(easm, expr)
+		if expType != cexp.types[0] {
+			log.Fatalf("%s:%d:%d ERROR expected return '%s' but got '%s'",
+				cexp.loc.filepath, cexp.loc.row, cexp.loc.col, eulTypes[expType], eulTypes[cexp.types[0]])
+		}
+
+		easm.pushInstruction(eulvm.Instruction{
+			OpCode:  eulvm.SWAP,
+			Operand: *uint256.NewInt(1),
+		})
+	}
+
+	e.popScope()
+
+	easm.pushInstruction(eulvm.Instruction{
+		OpCode: eulvm.RET},
+	)
+	easm.pushInstruction(eulvm.Instruction{
+		OpCode: eulvm.STOP},
+	)
 }
 
 func (e *eulang) compileVarIntoEasm(easm *easm, vd eulVarDef, storage varStorage) compiledVar {
@@ -199,13 +233,16 @@ func (e *eulang) compileFuncDefIntoEasm(easm *easm, fd eulFuncDef) {
 		log.Fatalf("%s:%d:%d ERROR double declaration. func '%s' was already defined",
 			fd.loc.filepath, fd.loc.row, fd.loc.col, fd.name)
 	}
+
 	f.addr = easm.program.Size()
 	f.name = fd.name
 	f.loc = fd.loc
 	f.params = fd.params
-	e.funcs[f.name] = f
 	f.modifier = fd.modifier
-	e.pushNewScope()
+	f.returns = fd.returns
+
+	e.funcs[f.name] = f
+	e.pushNewScope(fd.returns)
 
 	// compile func params
 	if fd.modifier == eulModifierKindExternal && len(fd.params) != 0 {
@@ -215,7 +252,9 @@ func (e *eulang) compileFuncDefIntoEasm(easm *easm, fd eulFuncDef) {
 	}
 
 	e.compileBlockIntoEasm(easm, &fd.body)
-	e.popScope()
+
+	// todo check pop scope inside of function
+	//e.popScope()
 
 	if fd.modifier != eulModifierKindExternal {
 		easm.pushInstruction(eulvm.Instruction{
@@ -273,11 +312,13 @@ func (e *eulang) compileStatementIntoEasm(easm *easm, stmt eulStatement) {
 	switch stmt.kind {
 	case eulStmtKindExpr:
 		expr := e.compileExprIntoEasm(easm, stmt.as.expr)
-		if expr.typee != eulTypeVoid {
-			// WE need to drop any result of statement as expression from stack because function must have it's return address on the stack
-			easm.pushInstruction(eulvm.Instruction{
-				OpCode: eulvm.DROP,
-			})
+		for _, t := range expr.types {
+			if t != eulTypeVoid {
+
+				easm.pushInstruction(eulvm.Instruction{
+					OpCode: eulvm.DROP,
+				})
+			}
 		}
 	case eulStmtKindIf:
 		e.compileIfIntoEasm(easm, stmt.as.eif)
@@ -292,6 +333,8 @@ func (e *eulang) compileStatementIntoEasm(easm *easm, stmt eulStatement) {
 		e.compileVarDefIntoEasm(easm, stmt.as.vardef, storageKindStack)
 	case eulStmtKindMapWrite:
 		e.compileMapWriteIntoEasm(easm, stmt.as.mapWrite)
+	case eulStmtKindReturn:
+		e.compileReturnIntoEasm(easm, stmt.as.freturn)
 	default:
 		panic(fmt.Sprintf("stmt kind doesn't exist kind %d", stmt.kind))
 	}
@@ -301,9 +344,9 @@ func (e *eulang) compileWhileIntoEasm(easm *easm, w eulWhile) {
 	condExpr := e.compileExprIntoEasm(easm, w.condition)
 	//TODO later make something like (checkCondExpression cause it seems like reusable)
 	//TODO for now we don't have booleans
-	if condExpr.typee != eulTypeBool {
+	if condExpr.types[0] != eulTypeBool {
 		log.Fatalf("%s:%d:%d ERROR while condition expression type should be boolean, got %s",
-			condExpr.loc.filepath, condExpr.loc.row, condExpr.loc.col, eulTypes[condExpr.typee])
+			condExpr.loc.filepath, condExpr.loc.row, condExpr.loc.col, eulTypes[condExpr.types[0]])
 	}
 
 	easm.PushInstruction(eulvm.Instruction{
@@ -313,7 +356,7 @@ func (e *eulang) compileWhileIntoEasm(easm *easm, w eulWhile) {
 	jumpWhileAddr := easm.PushInstruction(eulvm.Instruction{
 		OpCode: eulvm.JUMPI,
 	})
-	e.pushNewScope()
+	e.pushNewScope(e.scope.expReturn)
 	e.compileBlockIntoEasm(easm, &w.body)
 	e.popScope()
 	easm.PushInstruction(eulvm.Instruction{
@@ -373,9 +416,9 @@ func (e *eulang) compileVarAssignIntoEasm(easm *easm, expr eulVarAssign) {
 
 	compiledExpr := e.compileExprIntoEasm(easm, expr.value)
 
-	if compiledExpr.typee != vari.etype {
+	if compiledExpr.types[0] != vari.etype {
 		log.Fatalf("%s:%d:%d ERROR do not match types on the left and right side in expression '%s'. left side '%s' right '%s'",
-			expr.loc.filepath, expr.loc.row, expr.loc.col, expr.name, eulTypes[vari.etype], eulTypes[compiledExpr.typee])
+			expr.loc.filepath, expr.loc.row, expr.loc.col, expr.name, eulTypes[vari.etype], eulTypes[compiledExpr.types[0]])
 	}
 
 	easm.pushInstruction(eulvm.Instruction{
@@ -399,13 +442,13 @@ func (e *eulang) compileMapWriteIntoEasm(easm *easm, mwrite eulMapWrite) {
 	key := e.compileExprIntoEasm(easm, mwrite.key)
 	val := e.compileExprIntoEasm(easm, mwrite.value)
 
-	if mdef.keyType != key.typee {
+	if mdef.keyType != key.types[0] {
 		log.Fatalf("%s:%d:%d ERROR map '%s' write key type doesnt match. expected '%s' but got '%s'",
-			mwrite.loc.filepath, mwrite.loc.row, mwrite.loc.col, mwrite.name, eulTypes[mdef.keyType], eulTypes[key.typee])
+			mwrite.loc.filepath, mwrite.loc.row, mwrite.loc.col, mwrite.name, eulTypes[mdef.keyType], eulTypes[key.types[0]])
 	}
-	if mdef.valType != val.typee {
+	if mdef.valType != val.types[0] {
 		log.Fatalf("%s:%d:%d ERROR map '%s' write val type doesn't match. expected '%s' but got '%s'",
-			mwrite.loc.filepath, mwrite.loc.row, mwrite.loc.col, mwrite.name, eulTypes[mdef.valType], eulTypes[val.typee])
+			mwrite.loc.filepath, mwrite.loc.row, mwrite.loc.col, mwrite.name, eulTypes[mdef.valType], eulTypes[val.types[0]])
 	}
 
 	// TODO Eulang later add map write for dynamic types (do we need it?)
@@ -420,18 +463,23 @@ func (e *eulang) compileBinaryOpIntoEasm(easm *easm, binOp binaryOp) eulType {
 	lhsCompiled := e.compileExprIntoEasm(easm, binOp.lhs)
 	rhsCompiled := e.compileExprIntoEasm(easm, binOp.rhs)
 
-	if rhsCompiled.typee != lhsCompiled.typee {
-		log.Fatalf("%s:%d:%d ERROR expression types on left and right side do not match '%s' != '%s'",
-			binOp.loc.filepath, binOp.loc.row, binOp.loc.col, eulTypes[lhsCompiled.typee], eulTypes[rhsCompiled.typee])
+	if len(lhsCompiled.types) != 1 || len(rhsCompiled.types) != 1 {
+		log.Fatalf("%s:%d:%d ERROR binary operation can't return more than 1 value",
+			binOp.loc.filepath, binOp.loc.row, binOp.loc.col)
 	}
 
-	t := lhsCompiled.typee
+	if rhsCompiled.types[0] != lhsCompiled.types[0] {
+		log.Fatalf("%s:%d:%d ERROR expression types on left and right side do not match '%s' != '%s'",
+			binOp.loc.filepath, binOp.loc.row, binOp.loc.col, eulTypes[lhsCompiled.types[0]], eulTypes[rhsCompiled.types[0]])
+	}
+
+	t := lhsCompiled.types[0]
 
 	bOp, ok := binaryOpByType[t][binOp.kind]
 
 	if !ok {
 		log.Fatalf("%s:%d:%d ERROR impossible binary operation for types '%s' and '%s' ",
-			binOp.loc.filepath, binOp.loc.row, binOp.loc.col, eulTypes[lhsCompiled.typee], eulTypes[rhsCompiled.typee])
+			binOp.loc.filepath, binOp.loc.row, binOp.loc.col, eulTypes[lhsCompiled.types[0]], eulTypes[rhsCompiled.types[0]])
 	}
 
 	easm.pushInstruction(bOp.instruction)
@@ -483,9 +531,9 @@ func (e *eulang) compileMapReadIntoEasm(easm *easm, expr mapRead) eulType {
 	}
 
 	compiledKey := e.compileExprIntoEasm(easm, expr.key)
-	if compiledKey.typee != mread.keyType {
+	if compiledKey.types[0] != mread.keyType {
 		log.Fatalf("%s:%d:%d ERROR map read from map key type missmatched. expected '%s', but got '%s' ",
-			expr.loc.filepath, expr.loc.row, expr.loc.col, eulTypes[mread.keyType], eulTypes[compiledKey.typee])
+			expr.loc.filepath, expr.loc.row, expr.loc.col, eulTypes[mread.keyType], eulTypes[compiledKey.types[0]])
 	}
 
 	//TODO for now map read available only for fixed types
@@ -499,9 +547,9 @@ func (e *eulang) compileMapReadIntoEasm(easm *easm, expr mapRead) eulType {
 
 func (e *eulang) compileIfIntoEasm(easm *easm, eif eulIf) {
 	condExpr := e.compileExprIntoEasm(easm, eif.condition)
-	if condExpr.typee != eulTypeBool {
+	if condExpr.types[0] != eulTypeBool {
 		log.Fatalf("%s:%d:%d ERROR if condition expression type should be boolean, got %s",
-			eif.loc.filepath, eif.loc.row, eif.loc.col, eulTypes[condExpr.typee])
+			eif.loc.filepath, eif.loc.row, eif.loc.col, eulTypes[condExpr.types[0]])
 	}
 
 	easm.pushInstruction(eulvm.Instruction{
@@ -511,14 +559,14 @@ func (e *eulang) compileIfIntoEasm(easm *easm, eif eulIf) {
 	jmpThenAddr := easm.pushInstruction(eulvm.Instruction{
 		OpCode: eulvm.JUMPI,
 	})
-	e.pushNewScope()
+	e.pushNewScope(e.scope.expReturn)
 	e.compileBlockIntoEasm(easm, eif.ethen)
 	e.popScope()
 	jmpElseAddr := easm.pushInstruction(eulvm.Instruction{
 		OpCode: eulvm.JUMPDEST,
 	})
 	elseAddr := easm.program.Size()
-	e.pushNewScope()
+	e.pushNewScope(e.scope.expReturn)
 	e.compileBlockIntoEasm(easm, eif.elze)
 	e.popScope()
 	endAddr := easm.program.Size()
@@ -548,14 +596,14 @@ func (e *eulang) compileExprIntoEasm(easm *easm, expr eulExpr) compiledExpr {
 		// TODO temporary solution hard code just one function
 		if expr.as.funcCall.name == "write" {
 			e.compileNativeWriteIntoEasm(easm, expr.as.funcCall)
-			cExp.typee = eulTypeVoid
+			cExp.types = []eulType{eulTypeVoid}
 		} else if expr.as.funcCall.name == "writef" {
 			e.compileNativeWriteFIntoEasm(easm, expr.as.funcCall)
-			cExp.typee = eulTypeVoid
+			cExp.types = []eulType{eulTypeVoid}
 		} else {
-			e.compileFuncCallIntoEasm(easm, expr.as.funcCall)
+			types := e.compileFuncCallIntoEasm(easm, expr.as.funcCall)
 			// TODO we don't support return types yet
-			cExp.typee = eulTypeVoid
+			cExp.types = types
 		}
 	case eulExprKindStrLit:
 		var addr eulvm.Word = easm.pushStringToMemory(expr.as.strLit)
@@ -572,7 +620,7 @@ func (e *eulang) compileExprIntoEasm(easm *easm, expr eulExpr) compiledExpr {
 		easm.pushInstruction(pushStrSizeInst)
 
 		//TODO strings dont have their own type. But for now they're just i64 pointers to memory
-		cExp.typee = eulTypei64
+		cExp.types = []eulType{eulTypei64}
 	case eulExprKindBytes32Lit:
 		w := new(uint256.Int)
 		w.SetBytes32(expr.as.bytes32Lit.Bytes())
@@ -580,7 +628,7 @@ func (e *eulang) compileExprIntoEasm(easm *easm, expr eulExpr) compiledExpr {
 			OpCode:  eulvm.PUSH,
 			Operand: *w,
 		})
-		cExp.typee = eulTypeBytes32
+		cExp.types = []eulType{eulTypeBytes32}
 	case eulExprKindAddressLit:
 		w := new(uint256.Int)
 		w.SetBytes(expr.as.addressLit.Bytes())
@@ -588,13 +636,13 @@ func (e *eulang) compileExprIntoEasm(easm *easm, expr eulExpr) compiledExpr {
 			OpCode:  eulvm.PUSH,
 			Operand: *w,
 		})
-		cExp.typee = eulTypeAddress
+		cExp.types = []eulType{eulTypeAddress}
 	case eulExprKindIntLit:
 		easm.pushInstruction(eulvm.Instruction{
 			OpCode:  eulvm.PUSH,
 			Operand: *uint256.NewInt(uint64(expr.as.intLit)),
 		})
-		cExp.typee = eulTypei64
+		cExp.types = []eulType{eulTypei64}
 	case eulExprKindBoolLit:
 		if expr.as.boolean {
 			easm.pushInstruction(eulvm.Instruction{
@@ -607,13 +655,13 @@ func (e *eulang) compileExprIntoEasm(easm *easm, expr eulExpr) compiledExpr {
 			})
 		}
 
-		cExp.typee = eulTypeBool
+		cExp.types = []eulType{eulTypeBool}
 	case eulExprKindVarRead:
-		cExp.typee = e.compileVarReadIntoEasm(easm, expr.as.varRead)
+		cExp.types = []eulType{e.compileVarReadIntoEasm(easm, expr.as.varRead)}
 	case eulExprKindBinaryOp:
-		cExp.typee = e.compileBinaryOpIntoEasm(easm, *expr.as.binaryOp)
+		cExp.types = []eulType{e.compileBinaryOpIntoEasm(easm, *expr.as.binaryOp)}
 	case eulExprKindMapRead:
-		cExp.typee = e.compileMapReadIntoEasm(easm, *expr.as.mapRead)
+		cExp.types = []eulType{e.compileMapReadIntoEasm(easm, *expr.as.mapRead)}
 	default:
 		panic("unsupported expression kind")
 	}
@@ -643,12 +691,14 @@ func (e *eulang) compileNativeWriteIntoEasm(easm *easm, funcall eulFuncCall) {
 	})
 }
 
-func (e *eulang) compileFuncCallIntoEasm(easm *easm, funcCall eulFuncCall) {
-	//TODO add deffered compiled function addresses resolving later
+func (e *eulang) compileFuncCallIntoEasm(easm *easm, funcCall eulFuncCall) []eulType {
+	//TODO eulang/issues/10 add deffered compiled function addresses resolving later
+
 	compiledFunc, ok := e.funcs[funcCall.name]
 	if !ok {
 		panic(fmt.Sprintf("undefined compiled function %s", funcCall.name))
 	}
+
 	if compiledFunc.modifier == eulModifierKindExternal {
 		log.Fatalf("%s:%d:%d ERROR calling func with external modifier is forbidden",
 			funcCall.loc.filepath, funcCall.loc.row, funcCall.loc.col)
@@ -664,9 +714,9 @@ func (e *eulang) compileFuncCallIntoEasm(easm *easm, funcCall eulFuncCall) {
 			arg := funcCall.args[i]
 			param := compiledFunc.params[i]
 			expr := e.compileExprIntoEasm(easm, arg.value)
-			if param.typee != expr.typee {
+			if param.typee != expr.types[0] {
 				log.Fatalf("%s:%d:%d ERROR funcall type missmatch. Expected '%s' type but got '%s' instead ",
-					expr.loc.filepath, expr.loc.row, expr.loc.col, eulTypes[param.typee], eulTypes[expr.typee])
+					expr.loc.filepath, expr.loc.row, expr.loc.col, eulTypes[param.typee], eulTypes[expr.types[0]])
 			}
 		}
 	}
@@ -678,10 +728,13 @@ func (e *eulang) compileFuncCallIntoEasm(easm *easm, funcCall eulFuncCall) {
 	})
 
 	e.compilePopFrame(easm)
+
+	return compiledFunc.returns
 }
 
-func (e *eulang) pushNewScope() {
+func (e *eulang) pushNewScope(expReturn []eulType) {
 	scope := eulScope{
+		expReturn:    expReturn,
 		parent:       e.scope,
 		compiledVars: make(map[string]compiledVar),
 	}
