@@ -161,7 +161,7 @@ func (e *eulang) compileReturnIntoEasm(easm *easm, ret eulReturn) {
 
 	if len(ret.returnExprs) != len(e.scope.expReturn) {
 		log.Fatalf("%s:%d:%d ERROR expect return '%d' values but got '%d'",
-			ret.loc.filepath, ret.loc.row, ret.loc.col, len(ret.returnExprs), len(e.scope.expReturn))
+			ret.loc.filepath, ret.loc.row, ret.loc.col, len(e.scope.expReturn), len(ret.returnExprs))
 	}
 
 	for i := len(ret.returnExprs) - 1; i >= 0; i-- {
@@ -179,8 +179,6 @@ func (e *eulang) compileReturnIntoEasm(easm *easm, ret eulReturn) {
 			Operand: *uint256.NewInt(1),
 		})
 	}
-
-	e.popScope()
 
 	easm.pushInstruction(eulvm.Instruction{
 		OpCode: eulvm.RET},
@@ -253,9 +251,9 @@ func (e *eulang) compileFuncDefIntoEasm(easm *easm, fd eulFuncDef) {
 
 	e.compileBlockIntoEasm(easm, &fd.body)
 
-	// todo check pop scope inside of function
-	//e.popScope()
+	e.popScope()
 
+	// TODO check if function returns values it's supposed to return
 	if fd.modifier != eulModifierKindExternal {
 		easm.pushInstruction(eulvm.Instruction{
 			OpCode: eulvm.RET},
@@ -370,19 +368,39 @@ func (e *eulang) compileWhileIntoEasm(easm *easm, w eulWhile) {
 }
 
 func (e *eulang) compileMultiVarAssignIntoEasm(easm *easm, multiexp eulMultiAssign) {
-	//TODO for now supports only obvious case like a, b = c, d
-	if len(multiexp.names) != len(multiexp.values) {
-		log.Fatalf("%s:%d:%d ERROR assignment missmatch got '%d' variables but '%d' values",
-			multiexp.loc.filepath, multiexp.loc.row, multiexp.loc.col, len(multiexp.names), len(multiexp.values))
+
+	// 1. put all values on the stack | stack looks like [val1,val2,val3...]
+	var assignTypes []eulType
+
+	for i := len(multiexp.values) - 1; i >= 0; i-- {
+		exp := multiexp.values[i]
+		expr := e.compileExprIntoEasm(easm, exp)
+		assignTypes = append(assignTypes, expr.types...)
 	}
 
+	if len(multiexp.names) != len(assignTypes) {
+		log.Fatalf("%s:%d:%d ERROR expected '%d' values but got '%d'",
+			multiexp.loc.filepath, multiexp.loc.row, multiexp.loc.col, len(multiexp.names), len(assignTypes))
+	}
+
+	// 2. put addr on the stack one by one with swap and mstore [val1, val2, val3, addr3] -> swap -> [val1, val2, addr3, val3] -> mstore [val1, val2] ...
 	for i, name := range multiexp.names {
-		e.compileVarAssignIntoEasm(easm, eulVarAssign{
-			name:  name,
-			value: multiexp.values[i],
-			loc:   multiexp.loc,
+		vari := e.getCompiledVarByName(name)
+		if vari.etype != assignTypes[i] {
+			log.Fatalf("%s:%d:%d ERROR do not match types on the left and right side in expression. left side '%s' right '%s'",
+				multiexp.loc.filepath, multiexp.loc.row, multiexp.loc.col, eulTypes[vari.etype], eulTypes[assignTypes[i]])
+		}
+
+		e.compileGetVarAddr(easm, vari)
+		easm.pushInstruction(eulvm.Instruction{
+			OpCode:  eulvm.SWAP,
+			Operand: *uint256.NewInt(1),
+		})
+		easm.pushInstruction(eulvm.Instruction{
+			OpCode: eulvm.MSTORE256,
 		})
 	}
+
 }
 
 func (e *eulang) compileVarAssignIntoEasm(easm *easm, expr eulVarAssign) {
@@ -396,7 +414,7 @@ func (e *eulang) compileVarAssignIntoEasm(easm *easm, expr eulVarAssign) {
 	e.compileGetVarAddr(easm, vari)
 
 	// TODO maybe refactor its later
-	if vari.etype == eulTypeBytes32 {
+	if vari.etype == eulTypeBytes32 && expr.value.kind == eulExprKindStrLit {
 		expr.value.kind = eulExprKindBytes32Lit
 		expr.value.as.bytes32Lit = common.HexToHash(expr.value.as.strLit)
 		if expr.value.as.bytes32Lit.Hex() != expr.value.as.strLit {
@@ -404,7 +422,7 @@ func (e *eulang) compileVarAssignIntoEasm(easm *easm, expr eulVarAssign) {
 				expr.loc.filepath, expr.loc.row, expr.loc.col, expr.value.as.strLit)
 		}
 	}
-	if vari.etype == eulTypeAddress {
+	if vari.etype == eulTypeAddress && expr.value.kind == eulExprKindStrLit {
 		expr.value.kind = eulExprKindAddressLit
 		expr.value.as.addressLit = common.HexToAddress(expr.value.as.strLit)
 		if !common.IsHexAddress(expr.value.as.strLit) {
@@ -435,6 +453,7 @@ func (e *eulang) compileMapWriteIntoEasm(easm *easm, mwrite eulMapWrite) {
 
 	mapprefix := strToWords(fmt.Sprint(mdef.name, "."))
 	if len(mapprefix) > 1 {
+
 		log.Fatalf("%s:%d:%d ERROR map '%s' name is too long",
 			mwrite.loc.filepath, mwrite.loc.row, mwrite.loc.col, mwrite.name)
 	}

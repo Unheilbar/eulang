@@ -11,7 +11,7 @@ import (
 	"golang.org/x/crypto/sha3"
 )
 
-const StackCapacity = 33
+const StackCapacity = 100
 
 type keccakState interface {
 	hash.Hash
