@@ -16,7 +16,7 @@ go/src/cmd/compile/README.md guide into go compiler
  - [x] Add multiple arguments for writef native function
  - [ ] Add forward func declaration
  - [ ] Add params to external functions
- - [ ] Add var assignment after declaration
+ - [x] Add var assignment after declaration
  ##### low priotiy
  - [ ] Add i8, i64, i128
  - [ ] Add for loops
@@ -25,8 +25,8 @@ go/src/cmd/compile/README.md guide into go compiler
  - [ ] Introduce test utility (run functions with prefix Test)
  - [ ] Add #include directive
  - [ ] Add branching tokens support 'break', 'continue'
- - [ ] Remove semicolons(;) in the end of lines
- - [ ] Remove colon(:) before type
+ - [x] Remove semicolons(;) in the end of lines
+ - [x] Remove colon(:) before type
  ###### backlog
  - [ ] eulType should become expressions
  - [ ] add bad manners phrase generator for compile errors

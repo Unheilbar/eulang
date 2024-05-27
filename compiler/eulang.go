@@ -152,7 +152,17 @@ func (e *eulang) addMapDef(mdef eulMapDef) {
 func (e *eulang) compileVarDefIntoEasm(easm *easm, vd eulVarDef, storage varStorage) {
 	_ = e.compileVarIntoEasm(easm, vd, storage)
 	if vd.hasInit {
-		panic("var initialization after declaration is not implemented yet")
+		switch storage {
+		case storageKindStatic:
+			log.Fatalf("%s:%d:%d ERROR can't assign global variables yet",
+				vd.loc.filepath, vd.loc.row, vd.loc.col)
+
+		}
+		e.compileVarAssignIntoEasm(easm, eulVarAssign{
+			name:  vd.name,
+			value: vd.init,
+			loc:   vd.loc,
+		})
 	}
 }
 

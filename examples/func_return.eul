@@ -51,6 +51,13 @@ func entry() external {
 		write("FAIL\n")
 	}
 
+	var c i64 = 5
+	if c == 5 {
+		write ("pass\n")
+	} else {
+		write("fail\n")
+	}
+
 	write("pass\n")
 }
 
