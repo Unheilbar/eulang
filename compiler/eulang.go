@@ -186,19 +186,43 @@ func (e *eulang) addMapDef(mdef eulMapDef) {
 
 // TODO we don't check uniquness of global variables yet
 func (e *eulang) compileVarDefIntoEasm(easm *easm, vd eulVarDef, storage varStorage) {
-	_ = e.compileVarIntoEasm(easm, vd, storage)
+	cv := e.compileVarIntoEasm(easm, vd, storage)
 	if vd.hasInit {
 		switch storage {
 		case storageKindStatic:
-			log.Fatalf("%s:%d:%d ERROR can't assign global variables yet",
-				vd.loc.filepath, vd.loc.row, vd.loc.col)
-
+			reintepreter(cv, &vd.init)
+			e.setStaticVar(easm, cv, vd.init)
+			//log.Fatalf("%s:%d:%d ERROR can't assign global variables yet",
+			//	vd.loc.filepath, vd.loc.row, vd.loc.col)
+		case storageKindStack:
+			e.compileVarAssignIntoEasm(easm, eulVarAssign{
+				name:  vd.name,
+				value: vd.init,
+				loc:   vd.loc,
+			})
 		}
-		e.compileVarAssignIntoEasm(easm, eulVarAssign{
-			name:  vd.name,
-			value: vd.init,
-			loc:   vd.loc,
-		})
+	}
+}
+
+func (e *eulang) setStaticVar(easm *easm, cv compiledVar, expr eulExpr) {
+	switch expr.kind {
+	case eulExprKindIntLit:
+		val := *uint256.NewInt(uint64(expr.as.intLit))
+		addr := cv.addr
+		easm.memory.Set32(addr.Uint64(), val)
+	case eulExprKindAddressLit:
+		addr := cv.addr
+		val := expr.as.addressLit.Bytes()
+		w := new(uint256.Int)
+		w.SetBytes(val)
+		easm.memory.Set32(addr.Uint64(), *w)
+	case eulExprKindBytes32Lit:
+		addr := cv.addr
+		val := expr.as.bytes32Lit.Bytes()
+		easm.memory.Set(addr.Uint64(), uint64(len(val)), val)
+	default:
+		log.Fatalf("%s:%d:%d ERROR can't assign not literal to global var '%s'",
+			expr.loc.filepath, expr.loc.row, expr.loc.col, cv.name)
 	}
 }
 
@@ -257,7 +281,8 @@ func (e *eulang) compileVarIntoEasm(easm *easm, vd eulVarDef, storage varStorage
 
 	switch storage {
 	case storageKindStatic:
-		*cv.addr = easm.pushByteArrToMemory([]byte{0})
+		a := uint256.NewInt(15).Bytes32()
+		*cv.addr = easm.pushByteArrToMemory(a[:])
 	case storageKindStack:
 		e.frameSize += 32 // all var have the size of 1 machine word
 		*cv.addr = *uint256.NewInt(e.frameSize)
@@ -456,7 +481,6 @@ func (e *eulang) compileMultiVarAssignIntoEasm(easm *easm, multiexp eulMultiAssi
 
 func (e *eulang) compileVarAssignIntoEasm(easm *easm, expr eulVarAssign) {
 	vari := e.getCompiledVarByName(expr.name)
-
 	if vari == nil {
 		log.Fatalf("%s:%d:%d ERROR cannot assign not declared variable '%s'",
 			expr.loc.filepath, expr.loc.row, expr.loc.col, expr.name)
@@ -953,6 +977,25 @@ func (e *eulang) prepareVarStack(easm *easm, stackSize uint) {
 	result := easm.pushWordToMemory(*uint256.NewInt(uint64(stackSize * 32)))
 
 	e.stackFrameAddr = result
+}
+
+func reintepreter(vari compiledVar, expr *eulExpr) {
+	if vari.etype == eulTypeBytes32 && expr.kind == eulExprKindStrLit {
+		expr.kind = eulExprKindBytes32Lit
+		expr.as.bytes32Lit = common.HexToHash(expr.as.strLit)
+		if expr.as.bytes32Lit.Hex() != expr.as.strLit {
+			log.Fatalf("%s:%d:%d ERROR cannot convert str literal '%s' to bytes32",
+				expr.loc.filepath, expr.loc.row, expr.loc.col, expr.as.strLit)
+		}
+	}
+	if vari.etype == eulTypeAddress && expr.kind == eulExprKindStrLit {
+		expr.kind = eulExprKindAddressLit
+		expr.as.addressLit = common.HexToAddress(expr.as.strLit)
+		if !common.IsHexAddress(expr.as.strLit) {
+			log.Fatalf("%s:%d:%d ERROR cannot convert str literal '%s' to address",
+				expr.loc.filepath, expr.loc.row, expr.loc.col, expr.as.strLit)
+		}
+	}
 }
 
 // // TODO euler later can add here function arguments
