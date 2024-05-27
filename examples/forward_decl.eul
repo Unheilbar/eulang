@@ -1,0 +1,8 @@
+
+func entry() external {
+	call()
+}
+
+func call(){
+	write("pass\n")
+}
