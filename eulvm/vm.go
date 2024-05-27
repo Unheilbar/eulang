@@ -18,15 +18,20 @@ type keccakState interface {
 	Read([]byte) (int, error)
 }
 
+type State interface {
+	SetState(key common.Hash, val common.Hash)
+	GetState(key common.Hash) (val common.Hash)
+}
+
 // input can be accessed by Operations to set program entry point
 type EulVM struct {
 	program []Instruction //TODO make unsafe pointer to avoid program size check?
 
 	input []byte
 
-	state map[common.Hash]common.Hash // TODO later use actual stateDB as storage backend. map can be used for temporary map storage inside of smart contract
-
-	ip int
+	//state map[common.Hash]common.Hash // TODO later use actual stateDB as storage backend. map can be used for temporary map storage inside of smart contract
+	state State
+	ip    int
 
 	stack     [StackCapacity]Word
 	stackSize int
@@ -51,9 +56,12 @@ func New(prog Program) *EulVM {
 	return &EulVM{
 		program: prog.Instrutions,
 		memory:  m,
-		state:   make(map[common.Hash]common.Hash, 10),
 		hasher:  sha3.NewLegacyKeccak256().(keccakState),
 	}
+}
+
+func (e *EulVM) SetState(s State) {
+	e.state = s
 }
 
 func (e *EulVM) WithDebug() *EulVM {
@@ -228,27 +236,25 @@ exec:
 		val := e.stack[e.stackSize]
 		key := e.stack[e.stackSize-1]
 		e.stackSize -= 2
-		e.state[key.Bytes32()] = val.Bytes32()
+		e.state.SetState(key.Bytes32(), val.Bytes32())
 		e.ip++
 		return nil
 	case VSLOAD:
 		key := e.stack[e.stackSize].Bytes32()
-		e.stack[e.stackSize].SetBytes(e.state[key].Bytes())
+		e.stack[e.stackSize].SetBytes(e.state.GetState(key).Bytes())
 		e.ip++
 		return nil
 	case MAPVSSTORE:
 		val := e.stack[e.stackSize]
-		key := e.stack[e.stackSize-1].Bytes32()
-		mmapkey := inst.Operand.Bytes32()
-
-		copy(e.mapKeyBuffer[:32], key[:])
-		copy(e.mapKeyBuffer[32:], mmapkey[:])
+		key := e.stack[e.stackSize-1].Bytes()
+		copy(e.mapKeyBuffer[:32], key)
+		copy(e.mapKeyBuffer[32:], inst.Operand.Bytes())
 
 		e.hasher.Reset()
 		e.hasher.Write(e.mapKeyBuffer[:])
 		e.hasher.Read(e.hasherBuf[:])
 
-		e.state[e.hasherBuf] = val.Bytes32()
+		e.state.SetState(e.hasherBuf, val.Bytes32())
 
 		e.stackSize -= 2
 		e.ip++
@@ -263,7 +269,7 @@ exec:
 		e.hasher.Write(e.mapKeyBuffer[:])
 		e.hasher.Read(e.hasherBuf[:])
 
-		e.stack[e.stackSize].SetBytes(e.state[e.hasherBuf].Bytes())
+		e.stack[e.stackSize].SetBytes(e.state.GetState(e.hasherBuf).Bytes())
 		e.ip++
 		return nil
 	case LT:
