@@ -152,7 +152,11 @@ func (e *eulang) addMapDef(mdef eulMapDef) {
 func (e *eulang) compileVarDefIntoEasm(easm *easm, vd eulVarDef, storage varStorage) {
 	_ = e.compileVarIntoEasm(easm, vd, storage)
 	if vd.hasInit {
-		panic("var initialization after declaration is not implemented yet")
+		e.compileVarAssignIntoEasm(easm, eulVarAssign{
+			name:  vd.name,
+			value: vd.init,
+			loc:   vd.loc,
+		})
 	}
 }
 
