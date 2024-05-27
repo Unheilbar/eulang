@@ -15,7 +15,6 @@ func main() {
 	//e := eulvm.New(prog).WithDebug()
 	e := eulvm.New(prog)
 	input := eulang.GenerateInput(os.Args[2], os.Args[3:])
-
 	err := e.Run(input)
 	if err != nil {
 		log.Fatal(err)

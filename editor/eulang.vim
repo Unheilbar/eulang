@@ -13,27 +13,19 @@ endif
 syntax keyword eulangTodos TODO XXX FIXME NOTE
 
 " Language keywords
-"syntax keyword eulangKeywords nop push drop dup
-"syntax keyword eulangKeywords plusi minusi multi divi modi
-"syntax keyword eulangKeywords multu divu modu
-"syntax keyword eulangKeywords plusf minusf multf divf
-"syntax keyword eulangKeywords jmp jmp_if halt swap not
-"syntax keyword eulangKeywords eqi gei gti lei lti nei
-"syntax keyword eulangKeywords equ geu gtu leu ltu neu
-"syntax keyword eulangKeywords eqf gef gtf lef ltf nef
-"syntax keyword eulangKeywords ret call native
-"syntax keyword eulangKeywords andb orb xor shr shl notb
-"syntax keyword eulangKeywords read8u read16u read32u read64u
-"syntax keyword eulangKeywords read8i read16i read32i read64i
-"syntax keyword eulangKeywords write8 write16 write32 write64
-"syntax keyword eulangKeywords i2f u2f f2i f2u
 
 syntax keyword eulangLoopKeywords from to do
 
 syntax keyword eulangFuncDef func
+syntax keyword eulangCond if else elif
+syntax keyword eulangBoolLiteral true false
+syntax keyword eulangLoopKey while for range
+syntax keyword eulangStruct var
+syntax keyword eulangModifier external internal
+syntax keyword eulangTypes i64 bytes32 address
 
 " Comments
-syntax region eulangCommentLine start=";" end="$"   contains=eulangTodos
+syntax region eulangCommentLine start="//" end="$"   contains=eulangTodos
 syntax region eulangDirective start="%" end=" "
 
 syntax match eulangLabel		"[a-z_][a-z0-9_]*:"he=e-1
@@ -59,5 +51,12 @@ highlight default link eulangFloat Float
 highlight default link eulangString String
 highlight default link eulangLabel Label
 highlight default link eulangFuncDef Function
+highlight default link eulangCond Conditional
+highlight default link eulangBoolLiteral Boolean
+highlight default link eulangloopkey Repeat
+highlight default link eulangStruct  Structure
+highlight default link eulangModifier  StorageClass
+highlight default link eulangTypes  Type
+
 
 let b:current_syntax = "eulang"

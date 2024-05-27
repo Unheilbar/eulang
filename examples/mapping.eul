@@ -1,6 +1,5 @@
-map balances [bytes32] i64
-map limits [i64] i64
-
+map balances [bytes32]i64 
+map limits [i64]i64 
 
 func entry() external {
 	var key bytes32
