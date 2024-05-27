@@ -33,6 +33,14 @@ type compiledFunc struct {
 	modifier eulFuncModifier
 }
 
+type preparedHeader struct {
+	name     string
+	params   []eulFuncParam
+	returns  []eulType
+	modifier eulFuncModifier
+	body     eulBlock
+}
+
 type compiledExpr struct {
 	addr  int       // where it starts
 	types []eulType // the type that compiled expression returns
@@ -98,8 +106,12 @@ var binaryOpByType = map[eulType]map[eulBinaryOpKind]compileOp{
 
 // eulang stores all the context of 0euler compiler (compiled functions, scopes, etc.)
 type eulang struct {
-	funcs map[string]compiledFunc
-	maps  map[string]compiledMap
+	funcs       map[string]compiledFunc
+	funcHeaders map[string]preparedHeader
+
+	unresolvedAddrIndexes map[string][]int // key func name val index of unresolved call instructions list
+
+	maps map[string]compiledMap
 
 	scope *eulScope
 
@@ -112,12 +124,17 @@ func NewEulang() *eulang {
 		scope: &eulScope{
 			compiledVars: make(map[string]compiledVar),
 		},
-		funcs: make(map[string]compiledFunc),
-		maps:  make(map[string]compiledMap),
+
+		funcs:                 make(map[string]compiledFunc),
+		funcHeaders:           make(map[string]preparedHeader),
+		unresolvedAddrIndexes: make(map[string][]int),
+
+		maps: make(map[string]compiledMap),
 	}
 }
 
 func (e *eulang) compileModuleIntoEasm(easm *easm, module eulModule) {
+	e.prepareHeaders(module)
 	for _, top := range module.tops {
 		switch top.kind {
 		case eulTopKindFunc:
@@ -128,6 +145,25 @@ func (e *eulang) compileModuleIntoEasm(easm *easm, module eulModule) {
 			e.addMapDef(top.as.mdef)
 		default:
 			panic("try to compile unexpected top kind")
+		}
+	}
+}
+
+func (e *eulang) prepareHeaders(module eulModule) {
+	for _, top := range module.tops {
+		if top.kind == eulTopKindFunc {
+			fd := top.as.fdef
+			if _, ok := e.funcHeaders[fd.name]; ok {
+				log.Fatalf("%s:%d:%d ERROR double declaration. func '%s' was already defined",
+					fd.loc.filepath, fd.loc.row, fd.loc.col, fd.name)
+			}
+			e.funcHeaders[fd.name] = preparedHeader{
+				name:     fd.name,
+				params:   fd.params,
+				modifier: fd.modifier,
+				returns:  fd.returns,
+				body:     fd.body,
+			}
 		}
 	}
 }
@@ -243,6 +279,11 @@ func (e *eulang) compileFuncDefIntoEasm(easm *easm, fd eulFuncDef) {
 	}
 
 	f.addr = easm.program.Size()
+	if idxs, ok := e.unresolvedAddrIndexes[fd.name]; ok {
+		for _, idx := range idxs {
+			easm.program.Instrutions[idx].Operand = *uint256.NewInt(uint64(f.addr))
+		}
+	}
 	f.name = fd.name
 	f.loc = fd.loc
 	f.params = fd.params
@@ -631,7 +672,6 @@ func (e *eulang) compileExprIntoEasm(easm *easm, expr eulExpr) compiledExpr {
 			cExp.types = []eulType{eulTypeVoid}
 		} else {
 			types := e.compileFuncCallIntoEasm(easm, expr.as.funcCall)
-			// TODO we don't support return types yet
 			cExp.types = types
 		}
 	case eulExprKindStrLit:
@@ -723,25 +763,26 @@ func (e *eulang) compileNativeWriteIntoEasm(easm *easm, funcall eulFuncCall) {
 func (e *eulang) compileFuncCallIntoEasm(easm *easm, funcCall eulFuncCall) []eulType {
 	//TODO eulang/issues/10 add deffered compiled function addresses resolving later
 
-	compiledFunc, ok := e.funcs[funcCall.name]
+	header, ok := e.funcHeaders[funcCall.name]
 	if !ok {
-		panic(fmt.Sprintf("undefined compiled function %s", funcCall.name))
+		log.Fatalf("%s:%d:%d ERROR calling undefined func '%s'",
+			funcCall.loc.filepath, funcCall.loc.row, funcCall.loc.col, funcCall.name)
 	}
 
-	if compiledFunc.modifier == eulModifierKindExternal {
+	if header.modifier == eulModifierKindExternal {
 		log.Fatalf("%s:%d:%d ERROR calling func with external modifier is forbidden",
 			funcCall.loc.filepath, funcCall.loc.row, funcCall.loc.col)
 	}
 
 	//compile args
 	{
-		if len(funcCall.args) != len(compiledFunc.params) {
+		if len(funcCall.args) != len(header.params) {
 			log.Fatalf("%s:%d:%d ERROR funcall arity missmatch. Expected '%d' arguments but got '%d' instead ",
-				funcCall.loc.filepath, funcCall.loc.row, funcCall.loc.col, len(compiledFunc.params), len(funcCall.args))
+				funcCall.loc.filepath, funcCall.loc.row, funcCall.loc.col, len(header.params), len(funcCall.args))
 		}
 		for i := len(funcCall.args) - 1; i >= 0; i-- {
 			arg := funcCall.args[i]
-			param := compiledFunc.params[i]
+			param := header.params[i]
 			expr := e.compileExprIntoEasm(easm, arg.value)
 			if param.typee != expr.types[0] {
 				log.Fatalf("%s:%d:%d ERROR funcall type missmatch. Expected '%s' type but got '%s' instead ",
@@ -751,14 +792,20 @@ func (e *eulang) compileFuncCallIntoEasm(easm *easm, funcCall eulFuncCall) []eul
 	}
 	//framez
 	e.compilePushNewFrame(easm)
-	easm.pushInstruction(eulvm.Instruction{
+	cf, ok := e.funcs[funcCall.name]
+
+	idx := easm.pushInstruction(eulvm.Instruction{
 		OpCode:  eulvm.CALL,
-		Operand: *uint256.NewInt(uint64(compiledFunc.addr)),
+		Operand: *uint256.NewInt(uint64(cf.addr)),
 	})
+
+	if !ok {
+		e.unresolvedAddrIndexes[funcCall.name] = append(e.unresolvedAddrIndexes[funcCall.name], idx) // if func defenition is not compiled yet, we will resolve its address later
+	}
 
 	e.compilePopFrame(easm)
 
-	return compiledFunc.returns
+	return header.returns
 }
 
 func (e *eulang) pushNewScope(expReturn []eulType) {

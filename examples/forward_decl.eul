@@ -1,0 +1,16 @@
+func call2(a i64, b i64){
+	if a + b == 10 {
+		write("pass\n")
+	} else {
+		write("FAIL\n")
+	}
+}
+
+func entry() external {
+	call(7, 3)
+}
+
+func call(a i64, b i64){
+	call2(a, b)
+}
+
