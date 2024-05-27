@@ -19,8 +19,9 @@ type keccakState interface {
 }
 
 type State interface {
-	SetState(key common.Hash, val common.Hash)
-	GetState(key common.Hash) (val common.Hash)
+	SetState(txHash common.Hash, key common.Hash, val common.Hash)
+	GetState(txHash common.Hash, key common.Hash) (val common.Hash)
+	Reset()
 }
 
 // input can be accessed by Operations to set program entry point
@@ -236,26 +237,28 @@ exec:
 		val := e.stack[e.stackSize]
 		key := e.stack[e.stackSize-1]
 		e.stackSize -= 2
-		e.state.SetState(key.Bytes32(), val.Bytes32())
+		e.state.SetState(common.Hash{}, key.Bytes32(), val.Bytes32())
 		e.ip++
 		return nil
 	case VSLOAD:
 		key := e.stack[e.stackSize].Bytes32()
-		e.stack[e.stackSize].SetBytes(e.state.GetState(key).Bytes())
+		e.stack[e.stackSize].SetBytes(e.state.GetState(common.Hash{}, key).Bytes())
 		e.ip++
 		return nil
 	case MAPVSSTORE:
 		val := e.stack[e.stackSize]
-		key := e.stack[e.stackSize-1].Bytes()
-		copy(e.mapKeyBuffer[:32], key)
-		copy(e.mapKeyBuffer[32:], inst.Operand.Bytes())
+		key := e.stack[e.stackSize-1].Bytes32()
+		mmapkey := inst.Operand.Bytes32()
+
+		copy(e.mapKeyBuffer[:32], key[:])
+		copy(e.mapKeyBuffer[32:], mmapkey[:])
 
 		e.hasher.Reset()
 		e.hasher.Write(e.mapKeyBuffer[:])
 		e.hasher.Read(e.hasherBuf[:])
 
-		e.state.SetState(e.hasherBuf, val.Bytes32())
-
+		//e.state[e.hasherBuf] = val.Bytes32()
+		e.state.SetState(common.Hash{}, e.hasherBuf, val.Bytes32())
 		e.stackSize -= 2
 		e.ip++
 		return nil
@@ -269,7 +272,8 @@ exec:
 		e.hasher.Write(e.mapKeyBuffer[:])
 		e.hasher.Read(e.hasherBuf[:])
 
-		e.stack[e.stackSize].SetBytes(e.state.GetState(e.hasherBuf).Bytes())
+		//e.stack[e.stackSize].SetBytes(e.state[e.hasherBuf].Bytes())
+		e.stack[e.stackSize].SetBytes(e.state.GetState(common.Hash{}, e.hasherBuf).Bytes())
 		e.ip++
 		return nil
 	case LT:
@@ -374,6 +378,7 @@ func (e *EulVM) Reset() {
 	e.ip = 0
 	e.stackSize = 0
 	e.memory.reset()
+	e.state.Reset()
 }
 
 func (e *EulVM) Dump() {

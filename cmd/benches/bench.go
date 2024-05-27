@@ -34,7 +34,7 @@ func prepareBench() *benchSuit {
 	prog := compiler.CompileFromSource(eulang, file)
 	//e := eulvm.New(prog).WithDebug()
 	e := eulvm.New(prog)
-	e.SetState(state.New())
+	e.SetState(state.New(make(chan common.Hash)))
 	var bs = &benchSuit{}
 
 	bs.vm = e
