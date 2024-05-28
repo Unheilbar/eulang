@@ -10,13 +10,6 @@ import (
 	"github.com/holiman/uint256"
 )
 
-type eulGlobalVar struct {
-	addr  uint256.Int //offset inside of preallocated memory
-	typee eulType
-	loc   eulLoc
-	name  string
-}
-
 type compiledMap struct {
 	loc     eulLoc
 	name    string
@@ -143,6 +136,8 @@ func (e *eulang) compileModuleIntoEasm(easm *easm, module eulModule) {
 			e.compileVarDefIntoEasm(easm, top.as.vdef, storageKindStatic)
 		case eulTopKindMap:
 			e.addMapDef(top.as.mdef)
+		case eulTopKindEnum:
+			e.addEnumDef(easm, top.as.edef)
 		default:
 			panic("try to compile unexpected top kind")
 		}
@@ -181,6 +176,12 @@ func (e *eulang) addMapDef(mdef eulMapDef) {
 		name:    mdef.name,
 		keyType: mdef.keyType,
 		valType: mdef.valType,
+	}
+}
+
+func (e *eulang) addEnumDef(easm *easm, edef eulEnumDef) {
+	for _, v := range edef.body {
+		e.compileVarDefIntoEasm(easm, v, storageKindStatic)
 	}
 }
 
