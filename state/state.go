@@ -7,8 +7,8 @@ import (
 )
 
 type touchWrite struct {
-	txHash common.Hash
-	prev   common.Hash
+	tx      *tx
+	prevVal common.Hash
 }
 
 type storageChange struct {
@@ -20,46 +20,58 @@ type ParallelState struct {
 	mx sync.Mutex
 	kv map[common.Hash]common.Hash // kv represents any key val storage underhood our state. (for instance triedb)
 
-	allTouches   map[common.Hash][]common.Hash // touches represent access to state in current execution window where key is touched memory slot
+	allTouches   map[common.Hash][]*tx // touches represent access to state in current execution window where key is touched memory slot
 	touchesWrite map[common.Hash][]touchWrite
 
 	storageChanges map[common.Hash]storageChange
 	revert         chan common.Hash
 }
 
-func New(revert chan common.Hash) *ParallelState {
+func New() *ParallelState {
 	return &ParallelState{
-		revert:         revert,
-		kv:             make(map[common.Hash]common.Hash, 2),
-		allTouches:     make(map[common.Hash][]common.Hash, 2),
-		touchesWrite:   make(map[common.Hash][]touchWrite, 2),
+		kv: make(map[common.Hash]common.Hash, 2),
+
+		allTouches:   make(map[common.Hash][]*tx, 2),
+		touchesWrite: make(map[common.Hash][]touchWrite, 2),
+
 		storageChanges: make(map[common.Hash]storageChange, 2),
 	}
 }
 
-func (s *ParallelState) SetState(txHash common.Hash, key common.Hash, val common.Hash) {
+func (s *ParallelState) SetState(t *tx, key common.Hash, val common.Hash) {
 	s.mx.Lock()
 	defer s.mx.Unlock()
 
+	redo := make(map[common.Hash]*tx, 0)
+
 	if touches, ok := s.allTouches[key]; ok {
 		// slot was touched by other txes. revert and redo all txes with less priority than ours
-		for _, touchTxHash := range touches {
-			if touchTxHash.Cmp(txHash) < 0 {
-				sch := s.storageChanges[touchTxHash]
-				s.kv[sch.key] = sch.prevValue
-				s.revert <- touchTxHash
+		// TODO should also remove all touches by that tx
+		for _, touchTx := range touches {
+			if touchTx.priority < t.priority {
+				sch, ok := s.storageChanges[touchTx.hash]
+				if ok {
+					s.kv[sch.key] = sch.prevValue
+				}
+				redo[touchTx.hash] = touchTx
 			}
 		}
 	}
 
-	s.allTouches[key] = append(s.allTouches[key], txHash)
+	for _, tx := range redo {
+		go func() {
+			tx.redo <- tx
+		}()
+	}
+
+	s.allTouches[key] = append(s.allTouches[key], t)
 	s.touchesWrite[key] = append(s.touchesWrite[key], touchWrite{
-		txHash: txHash,
-		prev:   s.kv[key],
+		tx:      t,
+		prevVal: s.kv[key],
 	})
 
-	if _, ok := s.storageChanges[txHash]; !ok {
-		s.storageChanges[txHash] = storageChange{
+	if _, ok := s.storageChanges[t.hash]; !ok {
+		s.storageChanges[t.hash] = storageChange{
 			key:       key,
 			prevValue: s.kv[key],
 		}
@@ -68,21 +80,20 @@ func (s *ParallelState) SetState(txHash common.Hash, key common.Hash, val common
 	s.kv[key] = val
 }
 
-func (s *ParallelState) GetState(txHash common.Hash, key common.Hash) (val common.Hash) {
+func (s *ParallelState) GetState(tx *tx, key common.Hash) (val common.Hash) {
 	s.mx.Lock()
 	defer s.mx.Unlock()
 
-	s.allTouches[key] = append(s.allTouches[key], txHash)
+	s.allTouches[key] = append(s.allTouches[key], tx)
 
 	if txs, ok := s.touchesWrite[key]; ok {
 		// key was written by other txs. if tx priority of any of them is higher than ours we just take the last updated
-		// otherwise we get the key from the lowest tx priority
+		// otherwise we get the prev value from the lowest tx priority
 		var minVal common.Hash
-		var minTxHash = txHash
+		var minPriority = tx.priority
 		for _, write := range txs {
-			if write.txHash.Cmp(minTxHash) < 0 {
-				minTxHash = write.txHash
-				minVal = write.prev
+			if write.tx.priority < minPriority {
+				minVal = write.prevVal
 			} else {
 				return s.kv[key]
 			}
@@ -94,7 +105,7 @@ func (s *ParallelState) GetState(txHash common.Hash, key common.Hash) (val commo
 }
 
 func (s *ParallelState) Reset() {
-	s.allTouches = make(map[common.Hash][]common.Hash, 2)
+	s.allTouches = make(map[common.Hash][]*tx, 2)
 	s.touchesWrite = make(map[common.Hash][]touchWrite, 2)
 	s.storageChanges = make(map[common.Hash]storageChange)
 }
