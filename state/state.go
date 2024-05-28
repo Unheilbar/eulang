@@ -58,10 +58,10 @@ func (s *ParallelState) SetState(t *tx, key common.Hash, val common.Hash) {
 		}
 	}
 
-	for _, tx := range redo {
-		go func() {
-			tx.redo <- tx
-		}()
+	for _, t := range redo {
+		go func(t *tx) {
+			t.redo <- t
+		}(t)
 	}
 
 	s.allTouches[key] = append(s.allTouches[key], t)

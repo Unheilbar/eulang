@@ -1,8 +1,6 @@
 package state
 
 import (
-	"fmt"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/holiman/uint256"
 )
@@ -49,12 +47,11 @@ idle_loop:
 	for {
 		select {
 		case <-t.redo:
-			fmt.Println("redo", w.idx)
 			w.tryExec(t)
 		case <-w.pool[w.idx+1].done:
 			w.status = workerStatusDone
-			w.result <- t
 			close(w.done)
+			w.result <- t
 			break idle_loop
 		}
 	}
@@ -88,11 +85,10 @@ type window struct {
 	workers []*worker
 }
 
-func NewWindow(size int) *window {
+func NewWindow(state *ParallelState, size int) *window {
 	result := make(chan *tx)
 
 	workers := make([]*worker, size, size)
-	state := New()
 	for i := 0; i < size; i++ {
 		workers[i] = newWorker(state, result, i, workers)
 	}
@@ -115,13 +111,17 @@ func (win *window) Process(txes []*tx) {
 	}
 
 	var got int
-	for tx := range win.result {
-		fmt.Println("got tx with priotity", tx.priority)
+	for range win.result {
 		got++
 		if got == len(txes) {
 			break
 		}
 	}
 
-	fmt.Println("finished")
+}
+
+func (win *window) Reset() {
+	for i := 0; i < win.size; i++ {
+		win.workers[i].done = make(chan struct{})
+	}
 }
