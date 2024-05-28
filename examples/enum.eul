@@ -1,0 +1,12 @@
+enum (
+	animal1
+	animal2
+	animal3
+)
+
+
+func entry() external {
+	if animal2 == 1 {
+		write("enum success\n")
+	}
+}

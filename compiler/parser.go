@@ -302,18 +302,25 @@ type eulMapDef struct {
 	// TODO later add storage kind for maps
 }
 
+type eulEnumDef struct {
+	loc  eulLoc
+	body []eulVarDef
+}
+
 type eulTopKind uint8
 
 const (
 	eulTopKindFunc = iota
 	eulTopKindVar
 	eulTopKindMap
+	eulTopKindEnum
 )
 
 type eulTopAs struct {
 	vdef eulVarDef
 	fdef eulFuncDef
 	mdef eulMapDef
+	edef eulEnumDef
 }
 
 type eulTop struct {
@@ -351,6 +358,11 @@ func parseEulModule(lex *lexer) eulModule {
 
 			top.as.mdef = mdef
 			top.kind = eulTopKindMap
+		case "enum":
+			edef := parseEnumDef(lex)
+
+			top.as.edef = edef
+			top.kind = eulTopKindEnum
 		default:
 			log.Fatalf("%s:%d:%d expected module definitions but got keyword %s", t.loc.filepath, t.loc.row, t.loc.col, t.view)
 		}
@@ -397,6 +409,15 @@ func parseMapDef(lex *lexer) eulMapDef {
 	mdef.valType = parseEulType(lex)
 
 	return mdef
+}
+
+func parseEnumDef(lex *lexer) eulEnumDef {
+	var edef eulEnumDef
+	lex.expectKeyword("enum")
+	lex.expectToken(eulTokenKindOpenParen)
+	edef.body = parseEnumBody(lex)
+	return edef
+
 }
 
 func parseFuncDef(lex *lexer) eulFuncDef {
@@ -588,6 +609,32 @@ func parseCurlyEulBlock(lex *lexer) *eulBlock {
 	lex.expectToken(eulTokenKindCloseCurly)
 
 	return &result
+}
+
+func parseEnumBody(lex *lexer) []eulVarDef {
+	res := make([]eulVarDef, 0)
+
+	var t = &token{}
+
+	count := 0
+
+	for lex.peek(t, 0) && t.kind != eulTokenKindCloseParen {
+		res = append(res, eulVarDef{
+			name:    lex.expectToken(eulTokenKindName).view,
+			hasInit: true,
+			init: eulExpr{
+				kind: eulExprKindIntLit,
+				as: eulExprAs{
+					intLit: int64(count),
+				},
+			},
+		})
+		count++
+	}
+
+	lex.expectToken(eulTokenKindCloseParen)
+
+	return res
 }
 
 func parseVarAssign(lex *lexer) eulVarAssign {
