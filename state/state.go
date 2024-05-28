@@ -18,6 +18,7 @@ type storageChange struct {
 
 type ParallelState struct {
 	mx sync.Mutex
+
 	kv map[common.Hash]common.Hash // kv represents any key val storage underhood our state. (for instance triedb)
 
 	allTouches   map[common.Hash][]*tx // touches represent access to state in current execution window where key is touched memory slot

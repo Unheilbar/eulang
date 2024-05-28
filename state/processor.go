@@ -25,7 +25,7 @@ type worker struct {
 	idx    int
 	pool   []*worker
 	status workerStatus
-	state  *ParallelState
+	state  *slotState
 	done   chan struct{}
 
 	result chan *tx
@@ -73,7 +73,7 @@ func newWorker(state *ParallelState, result chan *tx, idx int, pool []*worker) *
 		pool:   pool,
 		idx:    idx,
 		result: result,
-		state:  state,
+		state:  newSlotState(state),
 		done:   make(chan struct{}),
 	}
 }

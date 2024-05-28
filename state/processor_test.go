@@ -7,7 +7,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
-const txAmount = 16
+const txAmount = 6
 const conflictPercentage = 10 // how many txes in window are in conflict
 
 func Benchmark_window(b *testing.B) {
@@ -56,7 +56,7 @@ func generateTxes(amount int64, conflictRate int64) []*tx {
 	var mod int64
 	if conflictRate == 0 {
 		mod = amount
-	} else if conflictRate == 100 {
+	} else if conflictRate >= 100 {
 		mod = 1
 	} else {
 		mod = amount - int64(float64(conflictRate)/100*float64(amount))
