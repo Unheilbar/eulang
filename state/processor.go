@@ -6,11 +6,9 @@ import (
 )
 
 type tx struct {
-	priority int
-	hash     common.Hash
-	key      common.Hash
-	val      common.Hash
-	redo     chan *tx
+	hash common.Hash
+	key  common.Hash
+	val  common.Hash
 }
 
 type workerStatus uint8
@@ -22,41 +20,54 @@ const (
 )
 
 type worker struct {
-	idx    int
-	pool   []*worker
-	status workerStatus
-	state  *slotState
-	done   chan struct{}
+	idx          int
+	pool         []*worker
+	status       workerStatus
+	state        *slotState
+	doneCh       chan struct{}
+	upperDirties chan map[common.Hash]common.Hash
 
 	result chan *tx
 }
 
 func (w *worker) process(t *tx) {
-	t.priority = w.idx
 	w.tryExec(t)
 
 	if w.idx == len(w.pool)-1 {
-		w.status = workerStatusDone
-		w.result <- t
-		close(w.done)
+		w.done(t)
 		return
 	}
 
 	w.status = workerStatusIdle
-idle_loop:
-	for {
-		select {
-		case <-t.redo:
-			w.tryExec(t)
-		case <-w.pool[w.idx+1].done:
-			w.status = workerStatusDone
-			close(w.done)
-			w.state.finilize() // tx executed the tx with lower priority can be executed
-			w.result <- t
-			break idle_loop
-		}
+	<-w.pool[w.idx+1].doneCh
+	fd := w.pool[w.idx+1].dirties()
+	if ok := w.state.validate(fd); ok {
+		w.state.mergeIntoDirtyFall(fd)
+		w.done(t)
+		return
 	}
 
+	w.status = workerStatusInProgress
+	w.state.revert() // validation failed, revert all tx changes and exec it with updatedDirties
+	w.state.updatedDirties = fd
+	w.tryExec(t)
+	w.state.mergeIntoDirtyFall(fd)
+	w.done(t)
+
+}
+
+func (w *worker) dirties() map[common.Hash]common.Hash {
+	return w.state.getDirties()
+}
+
+func (w *worker) done(t *tx) {
+	w.status = workerStatusDone
+	w.result <- t
+	// report dirties to lower priority worker
+	if w.idx == 0 {
+		close(w.result)
+	}
+	close(w.doneCh)
 }
 
 // some exec in a future using vm
@@ -65,17 +76,18 @@ func (w *worker) tryExec(tx *tx) {
 	val := w.state.GetState(tx.key)
 	nval := new(uint256.Int)
 	nval.SetBytes(val.Bytes())
-	nval.Add(nval, nval)
+	nval.Add(nval, uint256.NewInt(9))
 	w.state.SetState(tx.key, nval.Bytes32())
 }
 
-func newWorker(state *cacheLayer, result chan *tx, idx int, pool []*worker) *worker {
+func newWorker(state *StateDB, result chan *tx, idx int, pool []*worker) *worker {
 	return &worker{
-		pool:   pool,
-		idx:    idx,
-		result: result,
-		state:  newSlotState(state),
-		done:   make(chan struct{}),
+		pool:         pool,
+		idx:          idx,
+		result:       result,
+		state:        newSlotState(state),
+		doneCh:       make(chan struct{}),
+		upperDirties: make(chan map[common.Hash]common.Hash),
 	}
 }
 
@@ -86,7 +98,7 @@ type window struct {
 	workers []*worker
 }
 
-func NewWindow(state *cacheLayer, size int) *window {
+func NewWindow(state *StateDB, size int) *window {
 	result := make(chan *tx)
 
 	workers := make([]*worker, size, size)
@@ -106,23 +118,17 @@ func (win *window) Process(txes []*tx) {
 		panic("invalid usage of window")
 	}
 
-	for i := len(txes) - 1; i >= 0; i-- {
-		txes[i].redo = make(chan *tx)
-		go win.workers[i].process(txes[i])
+	for i, tx := range txes {
+		go win.workers[i].process(tx)
 	}
 
-	var got int
 	for range win.result {
-		got++
-		if got == len(txes) {
-			break
-		}
 	}
 
 }
 
 func (win *window) Reset() {
 	for i := 0; i < win.size; i++ {
-		win.workers[i].done = make(chan struct{})
+		win.workers[i].doneCh = make(chan struct{})
 	}
 }

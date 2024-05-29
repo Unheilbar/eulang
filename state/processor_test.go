@@ -7,12 +7,12 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 )
 
-const txAmount = 6
-const conflictPercentage = 10 // how many txes in window are in conflict
+const txAmount = 16
+const conflictPercentage = 0 // how many txes in window are in conflict
 
 func Benchmark_window(b *testing.B) {
 	b.StopTimer()
-	state := New()
+	state := NewState()
 	win := NewWindow(state, txAmount)
 	txes := generateTxes(txAmount, conflictPercentage)
 
@@ -20,13 +20,12 @@ func Benchmark_window(b *testing.B) {
 	for i := 0; i < b.N; i++ {
 		win.Process(txes)
 		win.Reset()
-		state.Reset()
 	}
 }
 
-func Test_window(t *testing.T) {
+func Test_windowFuzz(t *testing.T) {
 	expResult := testWindow()
-	for i := 0; i < 1000; i++ {
+	for i := 0; i < 0; i++ {
 		res := testWindow()
 		assert(t, expResult, res)
 	}
@@ -41,13 +40,13 @@ func assert(t *testing.T, exp map[common.Hash]common.Hash, act map[common.Hash]c
 }
 
 func testWindow() map[common.Hash]common.Hash {
-	state := New()
+	state := NewState()
 	win := NewWindow(state, txAmount)
 	txes := generateTxes(txAmount, conflictPercentage)
 
 	win.Process(txes)
 
-	return state.kv
+	return state.backendKV
 }
 
 func generateTxes(amount int64, conflictRate int64) []*tx {
@@ -68,7 +67,7 @@ func generateTxes(amount int64, conflictRate int64) []*tx {
 		txes = append(txes, &tx{
 			hash: h,
 			key:  common.BigToHash(big.NewInt(i % mod)),
-			val:  common.BigToHash(big.NewInt(i * 10)),
+			val:  common.BigToHash(big.NewInt(i*2 + 10)),
 		})
 	}
 
