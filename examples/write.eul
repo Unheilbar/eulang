@@ -2,5 +2,4 @@ func entry() external {
 	var i i64
 	i = 25
 	writef("hello! My %s is %d cantimeters long \n", "dick" , i)
-	1+1
 }
