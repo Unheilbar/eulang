@@ -36,7 +36,8 @@ type EulVM struct {
 	hasherBuf    common.Hash // Keccak256 hasher result array shared aross opcodes
 	mapKeyBuffer [64]byte
 
-	debug bool
+	debug      bool
+	returnData [5]Word
 }
 
 const ExecutionLimit = 1024
@@ -54,6 +55,10 @@ func New(prog Program) *EulVM {
 		state:   make(map[common.Hash]common.Hash, 10),
 		hasher:  sha3.NewLegacyKeccak256().(keccakState),
 	}
+}
+
+func (e *EulVM) GetReternData() [5]Word {
+	return e.returnData
 }
 
 func (e *EulVM) WithDebug() *EulVM {
@@ -82,6 +87,7 @@ var (
 	errInvalidOpCodeCalled  = errors.New("opcode doesn't exist")
 	errInvalidMemoryAccess  = errors.New("program accessed memory beyond memory capacity")
 	errUnknownNative        = errors.New("native function doesn't exists")
+	errTooManyArgs          = errors.New("too many arguments is function return")
 )
 
 var stopToken = errors.New("program stopped")
@@ -356,8 +362,21 @@ exec:
 		e.stack[a], e.stack[b] = e.stack[b], e.stack[a]
 		e.ip++
 		return nil
+	case RETDATA:
+		s := e.stackSize
+		l := int(inst.Operand.Uint64())
+		if l > len(e.returnData) {
+			return errTooManyArgs
+		}
+		for i := 1; i <= l; i++ {
+			e.returnData[i-1] = e.stack[s-i]
+		}
+
+		e.ip++
+		return nil
 	case STOP:
 		return stopToken
+
 	}
 
 	return errInvalidOpCodeCalled

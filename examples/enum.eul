@@ -5,8 +5,19 @@ enum (
 )
 
 
-func entry() external {
+func entry() external i64, i64, i64, address {
+	var a i64
+	var b i64
+	var c i64
+	var addr address
+
+	a = 5
+	b = 4
+	c = 23121
+	addr = "0x5aaeb6053f3e94c9b9a09f33669435e7ef1beaed"
+
 	if animal2 == 1 {
 		write("enum success\n")
 	}
+	return a, b, c, addr
 }

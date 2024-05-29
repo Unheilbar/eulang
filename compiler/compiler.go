@@ -15,7 +15,7 @@ func CompileFromSource(eulang *eulang, filename string) eulvm.Program {
 		OpCode: eulvm.CALLDATA,
 	})
 
-	eulang.pushNewScope(nil)
+	eulang.pushNewScope(nil, eulModifierKindInternal)
 	eulang.compileModuleIntoEasm(easm, module)
 	eulang.popScope()
 

@@ -1,6 +1,7 @@
 package compiler
 
 import (
+	"fmt"
 	"log"
 	"strconv"
 
@@ -303,7 +304,6 @@ type eulMapDef struct {
 }
 
 type eulEnumDef struct {
-	loc  eulLoc
 	body []eulVarDef
 }
 
@@ -459,6 +459,9 @@ func parseFuncDef(lex *lexer) eulFuncDef {
 			if !ok {
 				log.Fatalf("%s:%d:%d unknown type '%s'", t.loc.filepath, t.loc.row, t.loc.col, t.view)
 			}
+
+			//todo delete
+			fmt.Println("add to return: ", ttype)
 
 			f.returns = append(f.returns, ttype)
 			lex.expectToken(eulTokenKindName)
