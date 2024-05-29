@@ -17,7 +17,8 @@ type cacheLayer struct {
 
 	cache *lru.Cache[common.Hash, common.Hash]
 
-	updates []storageChange
+	pmx     sync.RWMutex
+	pending map[common.Hash]common.Hash
 
 	mx sync.RWMutex
 }
@@ -31,6 +32,10 @@ func NewCacheLayer() *cacheLayer {
 
 // returns value and list of invalidated tx
 func (cl *cacheLayer) get(key common.Hash) common.Hash {
+	if val, ok := cl.pending[key]; ok {
+		return val
+	}
+
 	if v, ok := cl.getFromCache(key); ok {
 		return v
 	}
@@ -40,13 +45,8 @@ func (cl *cacheLayer) get(key common.Hash) common.Hash {
 	return val
 }
 
-func (cl *cacheLayer) set(key common.Hash, val common.Hash) {
-	prev := cl.get(key)
-	cl.addToCache(key, val)
-	cl.updates = append(cl.updates, storageChange{
-		key:       key,
-		prevValue: prev,
-	})
+func (cl *cacheLayer) addPending(key common.Hash, val common.Hash) {
+	cl.pending[key] = val
 }
 
 func (cl *cacheLayer) addToCache(key common.Hash, val common.Hash) {
@@ -55,9 +55,9 @@ func (cl *cacheLayer) addToCache(key common.Hash, val common.Hash) {
 	cl.mx.Unlock()
 }
 
-func (cl *cacheLayer) getFromCache(key common.Hash) (common.Hash, bool) {
+func (cl *cacheLayer) getFromCache(key common.Hash) (val common.Hash, ok bool) {
 	cl.mx.RLock()
-	val, ok := cl.cache.Get(key)
+	val, ok = cl.cache.Get(key)
 	cl.mx.RUnlock()
-	return val, ok
+	return
 }

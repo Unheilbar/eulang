@@ -9,11 +9,9 @@ type slotState struct {
 	cache *cacheLayer
 
 	// context of current execution
-	tx      *tx
-	dirties map[common.Hash]common.Hash
-
-	stateReads   map[common.Hash]struct{}
-	stateUpdates map[common.Hash]struct{}
+	tx         *tx
+	dirties    map[common.Hash]common.Hash
+	stateReads map[common.Hash]common.Hash
 }
 
 func newSlotState(cache *cacheLayer) *slotState {
@@ -27,12 +25,25 @@ func (ss *slotState) GetState(key common.Hash) common.Hash {
 	if val, ok := ss.dirties[key]; ok {
 		return val
 	}
-
-	ss.cache
+	val := ss.cache.get(key)
+	ss.stateReads[key] = val
+	return val
 }
 
 func (ss *slotState) SetState(key common.Hash, val common.Hash) {
+	ss.dirties[key] = val
+}
 
+func (ss *slotState) revert() {
+	ss.dirties = make(map[common.Hash]common.Hash)
+	ss.stateReads = make(map[common.Hash]common.Hash)
+}
+
+// all dirties go to pending of underlying cache layer, report all dirties
+func (ss *slotState) finilize() {
+	for k, v := range ss.dirties {
+		ss.cache.setPending(k, v)
+	}
 }
 
 func (ss *slotState) reset()

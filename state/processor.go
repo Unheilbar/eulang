@@ -51,6 +51,7 @@ idle_loop:
 		case <-w.pool[w.idx+1].done:
 			w.status = workerStatusDone
 			close(w.done)
+			w.state.finilize() // tx executed the tx with lower priority can be executed
 			w.result <- t
 			break idle_loop
 		}
@@ -58,17 +59,17 @@ idle_loop:
 
 }
 
+// some exec in a future using vm
 func (w *worker) tryExec(tx *tx) {
 	w.status = workerStatusInProgress
-	// some exec in a future using vm
-	val := w.state.GetState(tx, tx.key)
+	val := w.state.GetState(tx.key)
 	nval := new(uint256.Int)
 	nval.SetBytes(val.Bytes())
 	nval.Add(nval, nval)
-	w.state.SetState(tx, tx.key, nval.Bytes32())
+	w.state.SetState(tx.key, nval.Bytes32())
 }
 
-func newWorker(state *ParallelState, result chan *tx, idx int, pool []*worker) *worker {
+func newWorker(state *cacheLayer, result chan *tx, idx int, pool []*worker) *worker {
 	return &worker{
 		pool:   pool,
 		idx:    idx,
@@ -85,7 +86,7 @@ type window struct {
 	workers []*worker
 }
 
-func NewWindow(state *ParallelState, size int) *window {
+func NewWindow(state *cacheLayer, size int) *window {
 	result := make(chan *tx)
 
 	workers := make([]*worker, size, size)
