@@ -1,0 +1,15 @@
+import (
+  "enum"
+  "hello"
+)
+
+func checkEnum() internal {
+	if animal2 == 1 {
+		write("enum success\n")
+	}
+}
+
+func mainImport() external {
+  HelloWorld()
+  checkEnum()
+}

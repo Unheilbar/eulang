@@ -1,3 +1,7 @@
-func main() external{
+func HelloWorld() internal {
+   write("hello from eulang HelloWorld method!\n")
+}
+
+func main() external {
    write("hello from eulang!")
 }

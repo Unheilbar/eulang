@@ -1,8 +1,10 @@
 package compiler
 
 import (
+	"fmt"
 	"log"
 	"strconv"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 )
@@ -341,6 +343,16 @@ func parseEulModule(lex *lexer) eulModule {
 
 		var top eulTop
 		switch t.view {
+		case "import":
+			basePath := lex.filepath
+			lastBin := strings.LastIndex(basePath, "/")
+			paths := parseImportPaths(lex, basePath[0:lastBin])
+			for _, path := range paths {
+				lex := NewLexerFromFile(path)
+				eulMod := parseEulModule(lex)
+				mod.tops = append(mod.tops, eulMod.tops...)
+			}
+			continue
 		case "func":
 			fdef := parseFuncDef(lex)
 
@@ -367,6 +379,7 @@ func parseEulModule(lex *lexer) eulModule {
 		}
 		mod.tops = append(mod.tops, top)
 	}
+
 	return mod
 }
 
@@ -417,6 +430,30 @@ func parseEnumDef(lex *lexer) eulEnumDef {
 	edef.body = parseEnumBody(lex)
 	return edef
 
+}
+
+func parseImportPaths(lex *lexer, path string) []string {
+	lex.expectKeyword("import")
+	lex.expectToken(eulTokenKindOpenParen)
+
+	return parseImportBody(lex, path)
+}
+
+func parseImportBody(lex *lexer, basePath string) []string {
+	paths := make([]string, 0)
+
+	var t = &token{}
+
+	for lex.peek(t, 0) && t.kind != eulTokenKindCloseParen {
+		var t = &token{}
+		lex.peek(t, 0)
+		path := fmt.Sprintf("./%s/%s.eul", basePath, lex.expectToken(eulTokenKindLitStr).view)
+		paths = append(paths, path)
+	}
+
+	lex.expectToken(eulTokenKindCloseParen)
+
+	return paths
 }
 
 func parseFuncDef(lex *lexer) eulFuncDef {
