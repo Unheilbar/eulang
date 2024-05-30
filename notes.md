@@ -23,7 +23,7 @@ go/src/cmd/compile/README.md guide into go compiler
  - [ ] Add enums
  - [ ] Add choice to examples
  - [ ] Introduce test utility (run functions with prefix Test)
- - [ ] Add #include directive
+ - [x] Add 'import' directive
  - [ ] Add branching tokens support 'break', 'continue'
  - [x] Remove semicolons(;) in the end of lines
  - [x] Remove colon(:) before type

@@ -24,8 +24,8 @@ run-examples:
 #	go run cmd/eule/main.go examples/multi_assign.eul entry
 #	go run cmd/eule/main.go examples/func_return.eul entry
 #	go run cmd/eule/main.go examples/forward_decl.eul entry
-	go run cmd/eule/main.go examples/global_assign.eul entry
-	go run cmd/eule/main.go examples/enum.eul entry
+#	go run cmd/eule/main.go examples/global_assign.eul entry
+	go run cmd/eule/main.go examples/import.eul mainImport
 
 run-bench:
 	go test -v cmd/benches/*.go -bench=. -benchtime=10s -benchmem
