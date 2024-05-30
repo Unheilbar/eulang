@@ -303,7 +303,6 @@ type eulMapDef struct {
 }
 
 type eulEnumDef struct {
-	loc  eulLoc
 	body []eulVarDef
 }
 

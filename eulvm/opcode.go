@@ -23,6 +23,7 @@ const (
 	CALL
 	CALLDATA
 	DATALOAD
+	RETDATA
 )
 
 // 0x10 range - comparison ops.

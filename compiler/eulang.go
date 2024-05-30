@@ -63,8 +63,9 @@ type compiledVar struct {
 type eulScope struct {
 	parent *eulScope
 
-	compiledVars map[string]compiledVar
-	expReturn    []eulType
+	compiledVars  map[string]compiledVar
+	expReturn     []eulType
+	scopeModifier eulFuncModifier
 }
 
 type compileOp struct {
@@ -228,7 +229,6 @@ func (e *eulang) setStaticVar(easm *easm, cv compiledVar, expr eulExpr) {
 }
 
 func (e *eulang) compileReturnIntoEasm(easm *easm, ret eulReturn) {
-	// TODO currently doesn't support return for external functions
 
 	if len(ret.returnExprs) != len(e.scope.expReturn) {
 		log.Fatalf("%s:%d:%d ERROR expect return '%d' values but got '%d'",
@@ -251,9 +251,19 @@ func (e *eulang) compileReturnIntoEasm(easm *easm, ret eulReturn) {
 		})
 	}
 
+	if e.scope.scopeModifier == eulModifierKindInternal {
+		easm.pushInstruction(eulvm.Instruction{
+			OpCode: eulvm.RET},
+		)
+		return
+	}
+
 	easm.pushInstruction(eulvm.Instruction{
-		OpCode: eulvm.RET},
+		OpCode:  eulvm.RETDATA,
+		Operand: *uint256.NewInt(uint64(len(ret.returnExprs))),
+	},
 	)
+
 	easm.pushInstruction(eulvm.Instruction{
 		OpCode: eulvm.STOP},
 	)
@@ -317,7 +327,7 @@ func (e *eulang) compileFuncDefIntoEasm(easm *easm, fd eulFuncDef) {
 	f.returns = fd.returns
 
 	e.funcs[f.name] = f
-	e.pushNewScope(fd.returns)
+	e.pushNewScope(fd.returns, fd.modifier)
 
 	// compile func params
 	if fd.modifier == eulModifierKindExternal && len(fd.params) != 0 {
@@ -431,7 +441,7 @@ func (e *eulang) compileWhileIntoEasm(easm *easm, w eulWhile) {
 	jumpWhileAddr := easm.PushInstruction(eulvm.Instruction{
 		OpCode: eulvm.JUMPI,
 	})
-	e.pushNewScope(e.scope.expReturn)
+	e.pushNewScope(e.scope.expReturn, e.scope.scopeModifier)
 	e.compileBlockIntoEasm(easm, &w.body)
 	e.popScope()
 	easm.PushInstruction(eulvm.Instruction{
@@ -654,14 +664,14 @@ func (e *eulang) compileIfIntoEasm(easm *easm, eif eulIf) {
 	jmpThenAddr := easm.pushInstruction(eulvm.Instruction{
 		OpCode: eulvm.JUMPI,
 	})
-	e.pushNewScope(e.scope.expReturn)
+	e.pushNewScope(e.scope.expReturn, e.scope.scopeModifier)
 	e.compileBlockIntoEasm(easm, eif.ethen)
 	e.popScope()
 	jmpElseAddr := easm.pushInstruction(eulvm.Instruction{
 		OpCode: eulvm.JUMPDEST,
 	})
 	elseAddr := easm.program.Size()
-	e.pushNewScope(e.scope.expReturn)
+	e.pushNewScope(e.scope.expReturn, e.scope.scopeModifier)
 	e.compileBlockIntoEasm(easm, eif.elze)
 	e.popScope()
 	endAddr := easm.program.Size()
@@ -833,11 +843,12 @@ func (e *eulang) compileFuncCallIntoEasm(easm *easm, funcCall eulFuncCall) []eul
 	return header.returns
 }
 
-func (e *eulang) pushNewScope(expReturn []eulType) {
+func (e *eulang) pushNewScope(expReturn []eulType, mod eulFuncModifier) {
 	scope := eulScope{
-		expReturn:    expReturn,
-		parent:       e.scope,
-		compiledVars: make(map[string]compiledVar),
+		expReturn:     expReturn,
+		parent:        e.scope,
+		compiledVars:  make(map[string]compiledVar),
+		scopeModifier: mod,
 	}
 	e.scope = &scope
 }
