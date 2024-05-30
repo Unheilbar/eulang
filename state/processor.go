@@ -1,6 +1,8 @@
 package state
 
 import (
+	"fmt"
+
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/holiman/uint256"
 )
@@ -62,12 +64,13 @@ func (w *worker) dirties() map[common.Hash]common.Hash {
 
 func (w *worker) done(t *tx) {
 	w.status = workerStatusDone
+	close(w.doneCh)
+	fmt.Println("w idx", w.idx, "send to result")
 	w.result <- t
 	// report dirties to lower priority worker
 	if w.idx == 0 {
 		close(w.result)
 	}
-	close(w.doneCh)
 }
 
 // some exec in a future using vm
@@ -78,6 +81,12 @@ func (w *worker) tryExec(tx *tx) {
 	nval.SetBytes(val.Bytes())
 	nval.Add(nval, uint256.NewInt(9))
 	w.state.SetState(tx.key, nval.Bytes32())
+}
+
+func (w *worker) reset(res chan *tx) {
+	w.doneCh = make(chan struct{})
+	w.result = res
+	w.state.reset()
 }
 
 func newWorker(state *StateDB, result chan *tx, idx int, pool []*worker) *worker {
@@ -92,8 +101,8 @@ func newWorker(state *StateDB, result chan *tx, idx int, pool []*worker) *worker
 }
 
 type window struct {
-	result chan *tx // txes that are ready for finilize
-
+	result  chan *tx // txes that are ready for finilize
+	state   *StateDB
 	size    int
 	workers []*worker
 }
@@ -107,6 +116,7 @@ func NewWindow(state *StateDB, size int) *window {
 	}
 
 	return &window{
+		state:   state,
 		result:  result,
 		size:    size,
 		workers: workers,
@@ -122,13 +132,18 @@ func (win *window) Process(txes []*tx) {
 		go win.workers[i].process(tx)
 	}
 
+	// gather tx receipts here
 	for range win.result {
 	}
 
+	win.finilize()
 }
 
-func (win *window) Reset() {
+func (win *window) finilize() {
+	fmt.Println("finilize")
+	win.state.updatePendings(win.workers[0].state.updatedDirties)
+	win.result = make(chan *tx)
 	for i := 0; i < win.size; i++ {
-		win.workers[i].doneCh = make(chan struct{})
+		win.workers[i].reset(win.result)
 	}
 }

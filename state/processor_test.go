@@ -8,7 +8,7 @@ import (
 )
 
 const txAmount = 16
-const conflictPercentage = 0 // how many txes in window are in conflict
+const conflictPercentage = 10 // how many txes in window are in conflict
 
 func Benchmark_window(b *testing.B) {
 	b.StopTimer()
@@ -19,13 +19,12 @@ func Benchmark_window(b *testing.B) {
 	b.StartTimer()
 	for i := 0; i < b.N; i++ {
 		win.Process(txes)
-		win.Reset()
 	}
 }
 
 func Test_windowFuzz(t *testing.T) {
 	expResult := testWindow()
-	for i := 0; i < 0; i++ {
+	for i := 0; i < 100000; i++ {
 		res := testWindow()
 		assert(t, expResult, res)
 	}
@@ -46,7 +45,7 @@ func testWindow() map[common.Hash]common.Hash {
 
 	win.Process(txes)
 
-	return state.backendKV
+	return state.pending
 }
 
 func generateTxes(amount int64, conflictRate int64) []*tx {

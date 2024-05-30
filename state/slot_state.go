@@ -28,7 +28,9 @@ func newSlotState(cache *StateDB) *slotState {
 
 func (ss *slotState) GetState(key common.Hash) common.Hash {
 	if ss.updatedDirties != nil {
-		return ss.updatedDirties[key]
+		if val, ok := ss.updatedDirties[key]; ok {
+			return val
+		}
 	}
 
 	if val, ok := ss.dirties[key]; ok {
@@ -75,9 +77,15 @@ func (ss *slotState) mergeIntoDirtyFall(upd map[common.Hash]common.Hash) {
 
 func (ss *slotState) revert() {
 	ss.dirties = make(map[common.Hash]common.Hash, 30)
+	ss.copyDirties = make(map[common.Hash]common.Hash, 30)
 	ss.reads = make(map[common.Hash]common.Hash, 30)
 	ss.updatedDirties = nil
 }
 
-// all dirties go to pending of underlying cache layer
-func (ss *slotState) finilize() {}
+func (ss *slotState) reset() {
+	ss.dirties = make(map[common.Hash]common.Hash, 30)
+	ss.copyDirties = make(map[common.Hash]common.Hash, 30)
+	ss.reads = make(map[common.Hash]common.Hash, 30)
+	ss.updatedDirties = nil
+
+}

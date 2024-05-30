@@ -11,16 +11,17 @@ const touchesPrealloc = 20
 var cacheCapacity = 1000
 
 type StateDB struct {
-	backendKV map[common.Hash]common.Hash // trieDB
+	backendKV map[common.Hash]common.Hash // trieDB lifetime - persistent
 
-	cache *lru.Cache[common.Hash, common.Hash]
+	cache *lru.Cache[common.Hash, common.Hash] // lifetime - uptime
 
-	pending map[common.Hash]common.Hash
+	pending map[common.Hash]common.Hash // lifetime - block
 }
 
 func NewState() *StateDB {
 	return &StateDB{
 		backendKV: make(map[common.Hash]common.Hash),
+		pending:   make(map[common.Hash]common.Hash),
 		cache:     lru.NewCache[common.Hash, common.Hash](cacheCapacity),
 	}
 }
@@ -40,4 +41,10 @@ func (sb *StateDB) get(key common.Hash) common.Hash {
 	val := sb.backendKV[key]
 
 	return val
+}
+
+func (sb *StateDB) updatePendings(dirties map[common.Hash]common.Hash) {
+	for k, v := range dirties {
+		sb.pending[k] = v
+	}
 }
