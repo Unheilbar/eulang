@@ -6,9 +6,10 @@ import (
 )
 
 type tx struct {
-	hash common.Hash
-	key  common.Hash
-	val  common.Hash
+	idx      int
+	hash     common.Hash
+	readKey  common.Hash
+	writeKey common.Hash
 }
 
 type workerStatus uint8
@@ -34,6 +35,7 @@ func (w *worker) process(t *tx) {
 	w.tryExec(t)
 
 	if w.idx == len(w.pool)-1 {
+		w.state.mergeIntoDirtyFall(w.state.dirties)
 		w.done(t)
 		return
 	}
@@ -53,7 +55,6 @@ func (w *worker) process(t *tx) {
 	w.tryExec(t)
 	w.state.mergeIntoDirtyFall(fd)
 	w.done(t)
-
 }
 
 func (w *worker) dirties() map[common.Hash]common.Hash {
@@ -65,7 +66,6 @@ func (w *worker) done(t *tx) {
 	w.result <- t
 	// report dirties to lower priority worker
 	if w.idx == 0 {
-		close(w.result)
 		return
 	}
 	w.doneCh <- struct{}{}
@@ -74,15 +74,12 @@ func (w *worker) done(t *tx) {
 // some exec in a future using vm
 func (w *worker) tryExec(tx *tx) {
 	w.status = workerStatusInProgress
-	val := w.state.GetState(tx.key)
-	nval := new(uint256.Int)
-	nval.SetBytes(val.Bytes())
-	nval.Add(nval, uint256.NewInt(9))
-	w.state.SetState(tx.key, nval.Bytes32())
+	w.state.GetState(tx.readKey)
+	nval := uint256.NewInt(200)
+	w.state.SetState(tx.writeKey, nval.Bytes32())
 }
 
-func (w *worker) reset(res chan *tx) {
-	w.result = res
+func (w *worker) reset() {
 	w.state.reset()
 }
 
@@ -91,7 +88,7 @@ func newWorker(state *StateDB, result chan *tx, idx int, pool []*worker) *worker
 		pool:         pool,
 		idx:          idx,
 		result:       result,
-		state:        newSlotState(state),
+		state:        newSlotState(state, idx),
 		doneCh:       make(chan struct{}),
 		upperDirties: make(chan map[common.Hash]common.Hash),
 	}
@@ -126,20 +123,26 @@ func (win *window) Process(txes []*tx) {
 	}
 
 	for i, tx := range txes {
-		go win.workers[i].process(tx)
+		wIdx := win.size - i - 1
+		go win.workers[wIdx].process(tx)
 	}
 
 	// gather tx receipts here
+	var acceptedTx int
 	for range win.result {
+		acceptedTx++
+		if acceptedTx == win.size {
+			break
+		}
 	}
+	acceptedTx = 0
 
 	win.finilize()
 }
 
 func (win *window) finilize() {
-	win.state.updatePendings(win.workers[0].state.updatedDirties)
-	win.result = make(chan *tx)
+	win.state.updatePendings(win.workers[0].state.mergedDirties)
 	for i := 0; i < win.size; i++ {
-		win.workers[i].reset(win.result)
+		win.workers[i].reset()
 	}
 }
