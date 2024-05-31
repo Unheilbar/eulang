@@ -19,10 +19,9 @@ type slotState struct {
 
 func newSlotState(cache *StateDB) *slotState {
 	return &slotState{
-		dirties:     make(map[common.Hash]common.Hash, 30),
-		copyDirties: make(map[common.Hash]common.Hash, 30),
-		reads:       make(map[common.Hash]common.Hash, 30),
-		cache:       cache,
+		dirties: make(map[common.Hash]common.Hash, 30),
+		reads:   make(map[common.Hash]common.Hash, 30),
+		cache:   cache,
 	}
 }
 
@@ -49,12 +48,11 @@ func (ss *slotState) GetState(key common.Hash) common.Hash {
 }
 
 func (ss *slotState) SetState(key common.Hash, val common.Hash) {
-	ss.copyDirties[key] = val
 	ss.dirties[key] = val
 }
 
 func (ss *slotState) getDirties() map[common.Hash]common.Hash {
-	return ss.copyDirties
+	return ss.dirties
 }
 
 func (ss *slotState) validate(upd map[common.Hash]common.Hash) bool {
@@ -75,17 +73,18 @@ func (ss *slotState) mergeIntoDirtyFall(upd map[common.Hash]common.Hash) {
 	ss.copyDirties = upd
 }
 
+// doesn't remove logs
 func (ss *slotState) revert() {
 	ss.dirties = make(map[common.Hash]common.Hash, 30)
-	ss.copyDirties = make(map[common.Hash]common.Hash, 30)
 	ss.reads = make(map[common.Hash]common.Hash, 30)
-	ss.updatedDirties = nil
 }
 
+// removes logs
 func (ss *slotState) reset() {
-	ss.dirties = make(map[common.Hash]common.Hash, 30)
-	ss.copyDirties = make(map[common.Hash]common.Hash, 30)
-	ss.reads = make(map[common.Hash]common.Hash, 30)
-	ss.updatedDirties = nil
-
+	for k := range ss.dirties {
+		delete(ss.dirties, k)
+	}
+	for k := range ss.reads {
+		delete(ss.reads, k)
+	}
 }

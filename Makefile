@@ -29,7 +29,4 @@ run-examples:
 run-bench-vm:
 	go test -v cmd/benches/*.go -bench=. -benchtime=10s -benchmem
 run-bench-state:
-	go test -v state/*.go -bench=.  -benchmem .benchtime=10s
-
-test-compiler:
-	go test -v compiler/*
+	go test -v state/*.go -bench=.  -benchmem .benchtime=10s  -run 'Benchmark'

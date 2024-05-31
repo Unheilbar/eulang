@@ -1,8 +1,6 @@
 package state
 
 import (
-	"fmt"
-
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/holiman/uint256"
 )
@@ -50,7 +48,7 @@ func (w *worker) process(t *tx) {
 	}
 
 	w.status = workerStatusInProgress
-	w.state.revert() // validation failed, revert all tx changes and exec it with updatedDirties
+	w.state.reset() // validation failed, revert all tx changes and exec it with updatedDirties
 	w.state.updatedDirties = fd
 	w.tryExec(t)
 	w.state.mergeIntoDirtyFall(fd)
@@ -64,13 +62,13 @@ func (w *worker) dirties() map[common.Hash]common.Hash {
 
 func (w *worker) done(t *tx) {
 	w.status = workerStatusDone
-	close(w.doneCh)
-	fmt.Println("w idx", w.idx, "send to result")
 	w.result <- t
 	// report dirties to lower priority worker
 	if w.idx == 0 {
 		close(w.result)
+		return
 	}
+	w.doneCh <- struct{}{}
 }
 
 // some exec in a future using vm
@@ -84,7 +82,6 @@ func (w *worker) tryExec(tx *tx) {
 }
 
 func (w *worker) reset(res chan *tx) {
-	w.doneCh = make(chan struct{})
 	w.result = res
 	w.state.reset()
 }
@@ -140,7 +137,6 @@ func (win *window) Process(txes []*tx) {
 }
 
 func (win *window) finilize() {
-	fmt.Println("finilize")
 	win.state.updatePendings(win.workers[0].state.updatedDirties)
 	win.result = make(chan *tx)
 	for i := 0; i < win.size; i++ {
