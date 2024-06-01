@@ -35,30 +35,25 @@ func (w *worker) process(t *tx) {
 	w.tryExec(t)
 
 	if w.idx == len(w.pool)-1 {
-		w.state.mergeIntoDirtyFall(w.state.dirties)
+		w.state.mergeDirties()
 		w.done(t)
 		return
 	}
 
 	w.status = workerStatusIdle
 	<-w.pool[w.idx+1].doneCh
-	fd := w.pool[w.idx+1].dirties()
-	if ok := w.state.validate(fd); ok {
-		w.state.mergeIntoDirtyFall(fd)
+	if ok := w.state.validate(); ok {
+		w.state.mergeDirties()
 		w.done(t)
 		return
 	}
 
 	w.status = workerStatusInProgress
 	w.state.reset() // validation failed, revert all tx changes and exec it with updatedDirties
-	w.state.updatedDirties = fd
+	w.state.setReexec()
 	w.tryExec(t)
-	w.state.mergeIntoDirtyFall(fd)
+	w.state.mergeDirties()
 	w.done(t)
-}
-
-func (w *worker) dirties() map[common.Hash]common.Hash {
-	return w.state.getDirties()
 }
 
 func (w *worker) done(t *tx) {
@@ -85,12 +80,11 @@ func (w *worker) reset() {
 
 func newWorker(state *StateDB, result chan *tx, idx int, pool []*worker) *worker {
 	return &worker{
-		pool:         pool,
-		idx:          idx,
-		result:       result,
-		state:        newSlotState(state, idx),
-		doneCh:       make(chan struct{}),
-		upperDirties: make(chan map[common.Hash]common.Hash),
+		pool:   pool,
+		idx:    idx,
+		result: result,
+		state:  newSlotState(state, idx),
+		doneCh: make(chan struct{}),
 	}
 }
 
@@ -141,7 +135,7 @@ func (win *window) Process(txes []*tx) {
 }
 
 func (win *window) finilize() {
-	win.state.updatePendings(win.workers[0].state.mergedDirties)
+	win.state.updatePendings()
 	for i := 0; i < win.size; i++ {
 		win.workers[i].reset()
 	}

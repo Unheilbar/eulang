@@ -1,15 +1,15 @@
 package state
 
 import (
-	"fmt"
+	"log"
 	"math/big"
 	"testing"
 
 	"github.com/ethereum/go-ethereum/common"
 )
 
-const txAmount = 20
-const conflictRate = 2 // how many txes in window are in conflict
+const txAmount = 30
+const conflictRate = 0 // how many txes in window are in conflict
 
 func Benchmark_window(b *testing.B) {
 	b.StopTimer()
@@ -25,7 +25,7 @@ func Benchmark_window(b *testing.B) {
 
 func Test_windowFuzz(t *testing.T) {
 	expResult := testWindow()
-	for i := 0; i < 0; i++ {
+	for i := 0; i < 10000; i++ {
 		res := testWindow()
 		assert(t, expResult, res)
 	}
@@ -49,7 +49,7 @@ func testWindow() map[common.Hash]common.Hash {
 	for _, tx := range txes {
 		_, ok := state.pending[tx.writeKey]
 		if !ok {
-			fmt.Println(tx.writeKey, "not found")
+			log.Println("key not found in pendings", tx.writeKey)
 		}
 	}
 
