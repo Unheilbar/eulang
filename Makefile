@@ -29,8 +29,7 @@ run-examples:
 	go run cmd/eule/main.go examples/enum.eul entry
 
 
-run-bench:
+run-bench-vm:
 	go test -v cmd/benches/*.go -bench=. -benchtime=10s -benchmem
-
-test-compiler:
-	go test -v compiler/*
+run-bench-state:
+	go test -v state/*.go -bench=.  -benchmem .benchtime=10s  -run 'Benchmark'
