@@ -96,3 +96,8 @@ func (ss *slotState) reset() {
 		delete(ss.reads, k)
 	}
 }
+
+// removes logs
+func (ss *slotState) Reset() {
+	ss.reset()
+}

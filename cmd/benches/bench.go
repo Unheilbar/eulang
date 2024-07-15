@@ -6,7 +6,6 @@ import (
 
 	"github.com/Unheilbar/eulang/compiler"
 	"github.com/Unheilbar/eulang/eulvm"
-	"github.com/Unheilbar/eulang/state"
 	"github.com/ethereum/go-ethereum/common"
 )
 
@@ -33,8 +32,7 @@ func prepareBench() *benchSuit {
 	eulang := compiler.NewEulang()
 	prog := compiler.CompileFromSource(eulang, file)
 	//e := eulvm.New(prog).WithDebug()
-	e := eulvm.New(prog)
-	e.SetState(state.New(make(chan common.Hash)))
+	e := eulvm.New(eulvm.NewMopState(), prog)
 	var bs = &benchSuit{}
 
 	bs.vm = e

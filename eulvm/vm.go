@@ -18,12 +18,6 @@ type keccakState interface {
 	Read([]byte) (int, error)
 }
 
-type State interface {
-	SetState(txHash common.Hash, key common.Hash, val common.Hash)
-	GetState(txHash common.Hash, key common.Hash) (val common.Hash)
-	Reset()
-}
-
 // input can be accessed by Operations to set program entry point
 type EulVM struct {
 	program []Instruction //TODO make unsafe pointer to avoid program size check?
@@ -48,7 +42,7 @@ type EulVM struct {
 
 const ExecutionLimit = 1024
 
-func New(prog Program) *EulVM {
+func New(state State, prog Program) *EulVM {
 	var m *Memory
 	if len(prog.PreallocMemory) != 0 {
 		m = NewMemoryWithPrealloc(prog.PreallocMemory)
@@ -59,6 +53,7 @@ func New(prog Program) *EulVM {
 		program: prog.Instrutions,
 		memory:  m,
 		hasher:  sha3.NewLegacyKeccak256().(keccakState),
+		state:   state,
 	}
 }
 
@@ -75,6 +70,7 @@ func (e *EulVM) WithDebug() *EulVM {
 	return e
 }
 
+// TODO return execution result in a future
 func (e *EulVM) Run(input []byte) error {
 	e.input = input
 
@@ -243,12 +239,12 @@ exec:
 		val := e.stack[e.stackSize]
 		key := e.stack[e.stackSize-1]
 		e.stackSize -= 2
-		e.state.SetState(common.Hash{}, key.Bytes32(), val.Bytes32())
+		e.state.SetState(key.Bytes32(), val.Bytes32())
 		e.ip++
 		return nil
 	case VSLOAD:
 		key := e.stack[e.stackSize].Bytes32()
-		e.stack[e.stackSize].SetBytes(e.state.GetState(common.Hash{}, key).Bytes())
+		e.stack[e.stackSize].SetBytes(e.state.GetState(key).Bytes())
 		e.ip++
 		return nil
 	case MAPVSSTORE:
@@ -264,7 +260,7 @@ exec:
 		e.hasher.Read(e.hasherBuf[:])
 
 		//e.state[e.hasherBuf] = val.Bytes32()
-		e.state.SetState(common.Hash{}, e.hasherBuf, val.Bytes32())
+		e.state.SetState(e.hasherBuf, val.Bytes32())
 		e.stackSize -= 2
 		e.ip++
 		return nil
@@ -278,8 +274,7 @@ exec:
 		e.hasher.Write(e.mapKeyBuffer[:])
 		e.hasher.Read(e.hasherBuf[:])
 
-		//e.stack[e.stackSize].SetBytes(e.state[e.hasherBuf].Bytes())
-		e.stack[e.stackSize].SetBytes(e.state.GetState(common.Hash{}, e.hasherBuf).Bytes())
+		e.stack[e.stackSize].SetBytes(e.state.GetState(e.hasherBuf).Bytes())
 		e.ip++
 		return nil
 	case LT:
@@ -397,7 +392,7 @@ func (e *EulVM) Reset() {
 	e.ip = 0
 	e.stackSize = 0
 	e.memory.reset()
-	e.state.Reset()
+	//e.state.Reset()
 }
 
 func (e *EulVM) Dump() {

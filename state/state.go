@@ -3,12 +3,14 @@ package state
 import (
 	"maps"
 
+	"github.com/Unheilbar/eulang/eulvm"
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/lru"
 )
 
 var cacheCapacity = 1000
 
+// used by execution slots for reading current world state
 type StateDB struct {
 	backendKV map[common.Hash]common.Hash // trieDB lifetime - persistent
 
@@ -62,3 +64,6 @@ func (sb *StateDB) Commit() {
 		delete(sb.mergeDirties, k)
 	}
 }
+
+func (sb *StateDB) SetCode([]byte) {}
+func (sb *StateDB) GetCode() eulvm.Program
